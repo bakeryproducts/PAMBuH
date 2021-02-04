@@ -41,7 +41,7 @@ class GdalSampler:
     def __next__(self):
         self.count += 1
         if self.count < len(self._markups):
-            return self.read_img(self.count)
+            return self.__getitem__(self.count)
         else:
             self.count = -1
             raise StopIteration("Failed to proceed to the next step")
@@ -50,4 +50,4 @@ class GdalSampler:
         return len(self._markups)
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        self.read_img(key)
+        return self.read_part(idx)

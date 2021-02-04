@@ -19,17 +19,22 @@ class GdalSampler:
         self._img = rasterio.open(img_path)
         self._wh = wh
         self._mask_wh = mask_wh
-        self._bands = (1,2,3)
+        self._bands = (1, 2, 3)
         self._count = -1
+        self._fill_value = 1
 
         self.polygs = [markup['geometry']['coordinates'][0] for markup in self._markups]
-        self.polygs_norm = [np.array(polyg) - np.mean(polyg, axis=0).tolist() for polyg in self.polygs]
+        self.polygs_norm = [(np.array(polyg) - np.array(Polygon(polyg).centroid) + np.array([mask_wh[0] // 2, mask_wh[0] // 2])).
+                                tolist() for polyg in self.polygs]
         self.polygs_cent_coord = [np.round(Polygon(polyg).centroid) for polyg in self.polygs]
         self.xoff = [int(polyg_cent_coord[0] - self._wh[0] // 2) for polyg_cent_coord in self.polygs_cent_coord]
         self.yoff = [int(polyg_cent_coord[1] - self._wh[1] // 2) for polyg_cent_coord in self.polygs_cent_coord]
 
-    def __iter__(self): return self
-    def __len__(self): return len(self._markups)
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self._markups)
 
     def __next__(self):
         self.count += 1
@@ -42,6 +47,5 @@ class GdalSampler:
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         window = Window(self.xoff[idx], self.yoff[idx], *self._wh)
         img = self._img.read(self._bands, window=window)
-        mask = None#polyg_to_mask(self.polygs_norm[idx], self._mask_wh)
-        return img, mask 
-               
+        mask = polyg_to_mask(self.polygs_norm[idx], self._mask_wh, self._fill_value)
+        return img, mask

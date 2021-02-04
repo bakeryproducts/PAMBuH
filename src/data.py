@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 import rasterio
 from rasterio.windows import Window
 
-from utils import polyg_to_mask
+from src.utils import polyg_to_mask
 
 
 class GdalSampler:
@@ -22,32 +22,26 @@ class GdalSampler:
         self._bands = (1,2,3)
         self._count = -1
 
-    def read_part(self, idx: int):
-        # List of coordinates
-        polyg = self._markups[idx]['geometry']['coordinates'][0]
-        # (x_cent,y_cent)
-        polyg_cent_coord = np.round(Polygon(polyg).centroid)
-        # Polygon with center in (0, 0)
-        polyg_norm = np.array(polyg) - np.mean(polyg, axis=0).tolist()
-        # Set window params
-        xoff, yoff = int(polyg_cent_coord[0] - self._wh[0] // 2), int(polyg_cent_coord[1] - self._wh[1] // 2)
-        xsize, ysize = self._wh[0], self._wh[1]
-        return self._img.read(self._bands, window=Window(xoff, yoff, xsize, ysize)), \
-               polyg_to_mask(polyg_norm, self._mask_wh)
+        self.polygs = [markup['geometry']['coordinates'][0] for markup in self._markups]
+        self.polygs_norm = [np.array(polyg) - np.mean(polyg, axis=0).tolist() for polyg in self.polygs]
+        self.polygs_cent_coord = [np.round(Polygon(polyg).centroid) for polyg in self.polygs]
+        self.xoff = [int(polyg_cent_coord[0] - self._wh[0] // 2) for polyg_cent_coord in self.polygs_cent_coord]
+        self.yoff = [int(polyg_cent_coord[1] - self._wh[1] // 2) for polyg_cent_coord in self.polygs_cent_coord]
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.count += 1
-        if self.count < len(self._markups):
-            return self.read_img(self.count)
+        self._count += 1
+        if self._count < len(self._markups):
+            return self.__getitem__(self._count)
         else:
-            self.count = -1
+            self._count = -1
             raise StopIteration("Failed to proceed to the next step")
 
     def __len__(self):
         return len(self._markups)
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        self.read_img(key)
+        return self._img.read(self._bands, window=Window(self.xoff[idx], self.yoff[idx], self._wh[0], self._wh[1])), \
+               polyg_to_mask(self.polygs_norm[idx], self._mask_wh)

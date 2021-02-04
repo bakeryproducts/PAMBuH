@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 import rasterio
 from rasterio.windows import Window
 
-from src.utils import polyg_to_mask
+from utils import polyg_to_mask
 
 
 class GdalSampler:
@@ -42,6 +42,6 @@ class GdalSampler:
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         window = Window(self.xoff[idx], self.yoff[idx], *self._wh)
         img = self._img.read(self._bands, window=window)
-        mask = polyg_to_mask(self.polygs_norm[idx], self._mask_wh)
+        mask = None#polyg_to_mask(self.polygs_norm[idx], self._mask_wh)
         return img, mask 
                

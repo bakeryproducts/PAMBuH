@@ -26,9 +26,9 @@ class GdalSampler:
         self.polygs = [markup['geometry']['coordinates'][0] for markup in self._markups]
         self.polygs_norm = [(np.array(polyg) - np.array(Polygon(polyg).centroid) + np.array([mask_wh[0] // 2, mask_wh[0] // 2])).
                                 tolist() for polyg in self.polygs]
-        self.polygs_cent_coord = [np.round(Polygon(polyg).centroid) for polyg in self.polygs]
-        self.xoff = [int(polyg_cent_coord[0] - self._wh[0] // 2) for polyg_cent_coord in self.polygs_cent_coord]
-        self.yoff = [int(polyg_cent_coord[1] - self._wh[1] // 2) for polyg_cent_coord in self.polygs_cent_coord]
+        polygs_cent_coord = [np.round(Polygon(polyg).centroid) for polyg in self.polygs]
+        self.xoff = [int(polyg_cent_coord[0] - self._wh[0] // 2) for polyg_cent_coord in polygs_cent_coord]
+        self.yoff = [int(polyg_cent_coord[1] - self._wh[1] // 2) for polyg_cent_coord in polygs_cent_coord]
 
     def __iter__(self):
         return self

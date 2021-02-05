@@ -21,7 +21,7 @@ class GdalSampler:
         self._mask_wh = mask_wh
         self._bands = (1, 2, 3)
         self._count = -1
-        self._fill_value = 1
+        self._fill_value = 255
 
         self.polygs = [markup['geometry']['coordinates'][0] for markup in self._markups]
         self.polygs_norm = [(np.array(polyg) - np.array(Polygon(polyg).centroid) + np.array([mask_wh[0] // 2, mask_wh[0] // 2])).
@@ -37,9 +37,9 @@ class GdalSampler:
         return len(self._markups)
 
     def __next__(self):
-        self.count += 1
-        if self.count < len(self._markups):
-            return self.__getitem__(self.count)
+        self._count += 1
+        if self._count < len(self._markups):
+            return self.__getitem__(self._count)
         else:
             self._count = -1
             raise StopIteration("Failed to proceed to the next step")

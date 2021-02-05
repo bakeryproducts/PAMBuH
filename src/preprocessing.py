@@ -2,6 +2,8 @@ import os
 import json
 
 from shapely import geometry
+from shapely.geometry import Polygon
+from utils import create_dir, jread, jdump
 
 
 def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None:
@@ -9,10 +11,8 @@ def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None
     """
 
     # Load
-    with open(f'{json_path_in}{img}.json') as json_file:
-        gloms = json.load(json_file)
-    with open(f'{json_path_in}{img}-anatomical-structure.json') as json_file:
-        anot_structure = json.load(json_file)
+    gloms = jread(f'{json_path_in}{img}.json')
+    anot_structure = jread(f'{json_path_in}{img}-anatomical-structure.json')
     # Create Cortex polygons
     polygs_anom = []
     for struct in anot_structure:
@@ -32,7 +32,6 @@ def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None
             gloms_in_cortex.append(glom)
     print(f"{len(gloms) - len(gloms_in_cortex)} glomerulus are removed in {img} ")
     # Save
-    if not os.path.isdir(json_path_out):
-        os.makedirs(json_path_out)
-    with open(f"{json_path_out}{img}.json", 'w') as outfile:
-        json.dump(gloms_in_cortex, outfile)
+    create_dir(json_path_out)
+    jdump(gloms_in_cortex, f"{json_path_out}{img}.json")
+

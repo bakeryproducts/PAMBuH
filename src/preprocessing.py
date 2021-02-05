@@ -10,6 +10,7 @@ def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None
     """ Filter glomerulus by location in Cortex. Load -> Preprocess -> Save.
     """
 
+    assert json_path_in != json_path_out, "json_path_in and json_path_out should be different to avoid overwriting"
     # Load
     gloms = jread(f'{json_path_in}{img}.json')
     anot_structure = jread(f'{json_path_in}{img}-anatomical-structure.json')

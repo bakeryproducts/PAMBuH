@@ -1,6 +1,7 @@
-import json
-from shapely.geometry import Polygon
 import os
+import json
+
+from shapely import geometry
 
 
 def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None:
@@ -18,9 +19,9 @@ def filt_glom_by_cortex(img: str, json_path_in: str, json_path_out: str) -> None
         if struct['properties']['classification']['name'] == 'Cortex':
             if struct['geometry']['type'] == 'MultiPolygon':
                 for coord in struct['geometry']['coordinates']:
-                    polygs_anom.append(Polygon(coord[0]))
+                    polygs_anom.append(geometry.Polygon(coord[0]))
             elif struct['geometry']['type'] == 'Polygon':
-                polygs_anom.append(Polygon(struct['geometry']['coordinates'][0]))
+                polygs_anom.append(geometry.Polygon(struct['geometry']['coordinates'][0]))
             else:
                 raise Exception("Invalid type value")
     assert len(polygs_anom) != 0, "No Cortex"

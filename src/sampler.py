@@ -10,7 +10,7 @@ from utils import polyg_to_mask
 
 
 class GdalSampler:
-    """Sample tiff file/img and return sampled_img and mask where 1 - glomerulus and 0 - no glomerulus.
+    """Iterates over img with annotation, returns tuples of img, mask
     """
 
     def __init__(self, img_path: str, img_markup_path: str, wh: Tuple[int], mask_wh: Tuple[int]):

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-import tifffile
+#import tifffile
+import rasterio
 
 dir_input = 'F:/kaggle/HuBMAP'
 dir_output = 'F:/kaggle/HuBMAP/masks'
@@ -16,12 +17,12 @@ def mask2rle(img):
 
 def rle2mask(mask_rle, shape):
     s = mask_rle.split()
-    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts, lengths = [np.asarray(x, dtype=np.int32) for x in (s[0:][::2], s[1:][::2])]
     starts -= 1
     ends = starts + lengths
-    img = np.zeros(shape[0]*shape[1], dtype=np.bool)  # 0 - no glom
+    img = np.zeros(shape[0]*shape[1], dtype=np.bool)
     for lo, hi in zip(starts, ends):
-        img[lo:hi] = True      # 1 - glom
+        img[lo:hi] = True
     return img.reshape(shape).T
 
 
@@ -33,8 +34,13 @@ def mask2tiff(tiff_name, dir_input, dir_output):      # tiff_name = '1e2425f28'
     width = int(info.iloc[index_csv, 1])
     height = int(info.iloc[index_csv, 2])
     mask = rle2mask(train.iloc[index_rle, 1], (width, height))
-    tifffile.imwrite(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", mask, photometric='minisblack')
+    #tifffile.imwrite(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", mask, photometric='minisblack')
+    dst = rasterio.open(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", 'w', driver='GTiff', height=height,
+                        width=width, count=1, nbits=1, dtype=np.uint8)
+    dst.write(mask.astype(np.uint8), 1)
+    dst.close()
+    del dst
 
-
-tiff_name = '0486052bb'
+tiff_name = 'aaa6a05cc'
 mask2tiff(tiff_name, dir_input, dir_output)
+train = pd.read_csv(f"{dir_input}/train.csv")

@@ -1,33 +1,55 @@
 # PAMBuH
 yendik challenge
 
-## GDAL install, ubuntu / debian
-```bash
-apt-get update
-apt-get install libgdal-dev
-export CPLUS_INCLUDE_PATH=/usr/include/gdal
-export C_INCLUDE_PATH=/usr/include/gdal
-gdal-config --version
-pip install GDAL==2.2.3
-```
-
 # TODO
 
-1. Sampler 
-```python
-s = Sampler('img.tif', 'img.json', wh=(256,256), maskwh=(256,256))
-img, mask = s[3]
-```
-2. Rle Code, with MINIMUM amount of bytes per pixel (idealy, 1bit, since mask is binary)
-```python
-rle2tiff('rle.json', 'img_rle.tiff')
-```
-3. Pipeline
+# SUBMIT!
+
+1. Preload, precut, presave all data.
+Data structure:
+-input
+    -train
+        -imgs
+            -04asd92
+                0000001.png
+                0000002.png
+                ...
+            -09asd2a
+                0000001.png
+                0000002.png
+                ...
+        -masks
+            -04asd92
+                0000001.png
+                0000002.png
+                ...
+            -09asd2a
+                0000001.png
+                0000002.png
+                ...
+-output
+    -2021_feb_07_12_13_55
+        -model
+            e100.pth
+        -logs
+        ...
+
+2. PostProcess
+ - cut test image on grid
+ - predict on Patches
+ - cut test image on overlapping grid
+ - predict on Patches
+ - join predictions
+ - RLE
+
+3. Submit 
+???
+
+n. Pipeline
 ```python
 datasets = build_datasets()
 dataloaders = build_dataloaders()
 model = build_model()
-start(model, dataloaders)
 ```
 
 Papers:

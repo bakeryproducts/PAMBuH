@@ -10,8 +10,10 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from tqdm.auto import tqdm
+import albumentations as albu
 
 import utils
+import augs
 from sampler import GdalSampler
 
 
@@ -74,6 +76,40 @@ class ConcatDataset:
     def __getitem__(self, idx): return self.load_item(idx)
 
 
+class TransformDataset:
+    def __init__(self, dataset, transform):
+        self.dataset = dataset
+        self.transforms = albu.Compose([]) if transforms is None else transforms
+    
+    def __getitem__(self, idx):
+        img, mask = self.dataset.__getitem__(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        return augmented["image"], augmented["mask"]
+    
+    def __len__(self): return len(self.dataset)
+
+def create_transforms(cfg,
+                      transform_factories,
+                      dataset_types=['TRAIN', 'VALID', 'TEST']):
+    transformers = {}
+    for dataset_type in dataset_types:
+        aug_type = cfg.TRANSFORMERS[dataset_type]['AUG']
+        args={
+            'aug_type':aug_type,
+            'transforms_cfg':cfg.TRANSFORMERS
+        }
+        if transform_factories[dataset_type]['factory'] is not None:
+            transform_getter = transform_factories[dataset_type]['transform_getter'](**args)
+            transformer = partial(transform_factories[dataset_type]['factory'], transforms=transform_getter)
+        else:
+            transformer = lambda x: x
+        transformers[dataset_type] = transformer
+    return transformers    
+
+def apply_transforms_datasets(datasets, transforms):
+    return {dataset_type:transforms[dataset_type](dataset) for dataset_type, dataset in datasets.items()}
+
+
 def expander(x):
     x = np.array(x)
     return x if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=-1), 3, -1)
@@ -82,6 +118,7 @@ def expander_float(x):
     x = np.array(x).astype(np.float32) / 255.
     x = x.transpose(2,0,1)
     return x if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=0), 3, 0)
+
 
 class SegmentDataset:
     '''
@@ -121,15 +158,29 @@ class SegmentDataset:
         pair = self.__getitem__(idx)
         return Image.blend(*pair,.5)
     
-def build_datasets(cfg=None, mode_train=True):
-    '''
-    todo path from cfg
-    '''
-    root = Path('input/train/512')
-    sd = SegmentDataset(root / 'imgs', root / 'masks', mode_train=mode_train)
-    return {'TRAIN':sd}
 
+def init_datasets(cfg):
+    DATA_DIR = Path(cfg.INPUTS).absolute()
+    if not DATA_DIR.exists(): raise Exception(DATA_DIR)
+    
+    DATASETS = {
+        "TRAIN": SegmentDataset(DATA_DIR/'train/imgs', DATA_DIR/'train/masks'),
+    }
+    return  DATASETS
 
+def build_datasets(cfg, mode_train=True):
+    def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
+    transform_factory = {
+            'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
+            'TEST':{'factory': TransformDataset, 'transform_getter':train_trans_get},
+            'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
+        }
+    
+    datasets = init_datasets(cfg)
+    
+    transforms = create_transforms(cfg, transform_factory)
+    datasets = apply_transforms_datasets(datasets, transforms)
+    return datasets
 
 def create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_last, pin):
     dl = DataLoader(

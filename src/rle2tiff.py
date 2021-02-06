@@ -36,5 +36,5 @@ def mask2tiff(tiff_name, dir_input, dir_output):      # tiff_name = '1e2425f28'
     tifffile.imwrite(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", mask, photometric='minisblack')
 
 
-#tiff_name = '0486052bb'
-#mask2tiff(tiff_name, dir_input, dir_output)
+tiff_name = '0486052bb'
+mask2tiff(tiff_name, dir_input, dir_output)

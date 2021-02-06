@@ -1,0 +1,43 @@
+INPUTS: input
+OUTPUTS: output
+
+DATA:
+  TRAIN:
+    DATASETS: ['train']
+    GPU_PRELOAD: False
+    PRELOAD: False
+    CACHE: False
+  VALID:
+    DATASETS: []
+    PRELOAD: False
+  TEST:
+    DATASETS: []
+
+TRANSFORMERS:
+  TRAIN:
+    AUG: 'light'
+  VALID:
+    AUG: 'test'
+  TEST:
+    AUG: 'test'
+  CROP: [512, 512]
+  RESIZE: [512, 512]
+
+TRAIN:
+  DOWNSCALE: 2
+  GPUS: [0,1,2,3]
+  NUM_WORKERS: 8
+  
+  SAVE_STEP: 50
+  SCALAR_STEP: 1
+  TB_STEP: 20
+  
+  EPOCH_COUNT: 10
+  BATCH_SIZE: 64
+VALID:
+  BATCH_SIZE: 1
+TEST:
+  BATCH_SIZE: 1
+  
+PARALLEL:
+  DDP: False

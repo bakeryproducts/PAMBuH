@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
-import skimage.io
-import tifffile
+import rasterio
 
-dir_input = 'F:/kaggle/HuBMAP'
-dir_output = 'F:/kaggle/HuBMAP/masks'
+dir_input = '../input/hm'
+dir_output = '../input/bigmasks'
 
 def mask2rle(img):
     pixels= img.T.flatten()
@@ -15,23 +14,30 @@ def mask2rle(img):
 
 def rle2mask(mask_rle, shape):
     s = mask_rle.split()
-    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts, lengths = [np.asarray(x, dtype=np.int32) for x in (s[0:][::2], s[1:][::2])]
     starts -= 1
     ends = starts + lengths
-    img = np.zeros(shape[0]*shape[1], dtype=np.uint8) # 0 - no glom
+    img = np.zeros(shape[0]*shape[1], dtype=np.bool) 
     for lo, hi in zip(starts, ends):
-        img[lo:hi] = 1 # 0 - glom
-    return img.reshape(shape).T
+        img[lo:hi] = True
+    return img.reshape(shape).T # .T ?? WTF
 
-def mask2tiff(pic_num, dir_input, dir_output, rle2mask):
-    image = skimage.io.imread(f"{dir_input}/train/{train_df.iloc[pic_num,0]}.tiff")
-    mask = rle2mask(train_df.iloc[pic_num, 1], (image.shape[-2], image.shape[-3]))
-    mask_norm = mask.astype(bool)
-    tifffile.imwrite(f"{dir_output}/{train_df.iloc[pic_num,0]}_mask.tiff", mask_norm, photometric='minisblack')
+def mask2tiff(pic_num, dir_input, dir_output):
+    ds = rasterio.open(f"{dir_input}/train/{train_df.iloc[pic_num,0]}.tiff")
+    w,h = ds.shape
+    ds.close()
+    del ds
+    mask = rle2mask(train_df.iloc[pic_num, 1], (h,w))
+    dst = rasterio.open(f"{dir_output}/{train_df.iloc[pic_num,0]}_mask.tiff", 'w', driver='GTiff',
+                            height = w, width = h, count=1, nbits=1, dtype=np.uint8)
+    dst.write(mask.astype(np.uint8), 1)
+    dst.close()
+    del dst
 
 train = pd.read_csv(f"{dir_input}/train.csv")
 info = pd.read_csv(f"{dir_input}/HuBMAP-20-dataset_information.csv")
 train_df = pd.read_csv(f"{dir_input}/train.csv")
 
-for pic_num in range (8):                   # tiff output loop
-    mask2tiff(pic_num, dir_input, dir_output, rle2mask)\
+for idx in range (8):
+    print(idx)
+    mask2tiff(idx, dir_input, dir_output)

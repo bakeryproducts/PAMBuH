@@ -1,9 +1,12 @@
-import json
 import os
+import json
+import argparse
+import datetime
 from pathlib import Path
 from functools import partial
 from typing import Tuple, List, Dict, Callable
 
+import torch
 import cv2
 from shapely import geometry
 import numpy as np
@@ -60,5 +63,31 @@ def create_dir(path: str) -> None:
     if not os.path.isdir(path):
         os.makedirs(path)
 
+def make_folders(cfg):
+    cfg_postfix = 'PAMBUH'
+    timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
+    name = Path(timestamp + '_' + cfg_postfix)
+    fname = cfg.OUTPUTS / name
+    os.makedirs(fname, exist_ok=True)
+    img_dir = fname / 'imgs'
+    os.makedirs(img_dir, exist_ok=True)
+    models_dir = fname / 'models'
+    os.makedirs(models_dir, exist_ok=True)
+    tb_dir = fname / 'tb'
+    os.makedirs(tb_dir, exist_ok=True)
+    
+    return fname
 
+def save_models(d, postfix, output_folder):
+    for k, v in d.items():
+        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl")) 
 
+def dump_params(cfg, output_path):
+    with open(os.path.join(output_path, 'cfg.yaml'), 'w') as f:
+        f.write(cfg.dump())
+        
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--local_rank", default=0, type=int)
+    args = parser.parse_args()
+    return args

@@ -54,4 +54,9 @@ class GdalSampler:
         window_mask = Window(self.xoff_mask[idx], self.yoff_mask[idx], *self._mask_wh)
         img = self._img.read(self._bands_img, window=window_img)
         mask = self._masks.read(self._bands_mask, window=window_mask)
-        return img, mask
+        return img, mask.astype(bool)
+
+    def __del__(self):
+        del self._markups
+        del self._masks
+        del self._img

@@ -122,8 +122,7 @@ def start(cfg, output_folder, n_epochs):
     dls = build_dataloaders(cfg, datasets, drop_last=True, pin=True)
     
     model, opt = build_model(cfg)
-    criterion = BceLoss
-    
+    criterion = torch.nn.BCEWithLogitsLoss()
     
     ########## CALLBACKS #########
     train_cb = TrainCB(logger=logger)

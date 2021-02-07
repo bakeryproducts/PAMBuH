@@ -3,7 +3,7 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['cuts512']
+    DATASETS: ['cuts512_small']
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
@@ -24,6 +24,7 @@ TRANSFORMERS:
   RESIZE: [512, 512]
 
 TRAIN:
+  AMP: False
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
@@ -32,7 +33,7 @@ TRAIN:
   TB_STEP: 20
   
   EPOCH_COUNT: 10
-  BATCH_SIZE: 64
+  BATCH_SIZE: 4
 VALID:
   BATCH_SIZE: 1
 TEST:
@@ -40,3 +41,4 @@ TEST:
   
 PARALLEL:
   DDP: False
+  IS_MASTER: True

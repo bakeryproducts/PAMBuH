@@ -20,8 +20,8 @@ from model import build_model
 def upscale(tensor, size): return torch.nn.functional.interpolate(tensor, size=size)
 
 def denorm(images, mean=(0.46454108, 0.43718538, 0.39618185), std=(0.23577851, 0.23005974, 0.23109385)):
-    mean=torch.tensor(mean).view((1,3,1,1)).cuda()
-    std=torch.tensor(std).view((1,3,1,1)).cuda()
+    mean=torch.tensor(mean).view((1,3,1,1))
+    std=torch.tensor(std).view((1,3,1,1))
     images = images * std + mean
     return images
 
@@ -33,6 +33,23 @@ class CudaCB(sh.callbacks.Callback):
         self.learner.batch = xb.cuda(), yb
             
     def before_fit(self): self.model.cuda()
+
+
+class TrackResultsCB(sh.callbacks.Callback):
+    def before_epoch(self): self.accs,self.losses,self.ns = [],[],[]
+        
+    def after_epoch(self):
+        n = sum(self.ns)
+        print(self.n_epoch, self.model.training,
+              sum(self.losses).item()/n, sum(self.accs).item()/n)
+        
+    def after_batch(self):
+        xb, yb = self.batch
+        acc = 1#(self.preds.argmax(dim=1)==yb).float().sum()
+        self.accs.append(acc)
+        n = len(xb)
+        self.losses.append(self.loss*n)
+        self.ns.append(n)
 
 class TBMetricCB(TrackResultsCB):
     def __init__(self, writer, logger=None, metrics={'totals':['total_loss']}): sh.utils.store_attr(self, locals())
@@ -72,8 +89,9 @@ class TBPredictionsCB(sh.callbacks.Callback):
         img_preds = upscale(img_preds.detach().cpu(), (H,W))
 
         mean, std = self.kwargs['cfg'].TRANSFORMERS.MEAN, self.kwargs['cfg'].TRANSFORMERS.STD 
+        images = images.detach().cpu()
         images = denorm(images, mean, std)
-        images = upscale(images.detach().cpu(), (H,W))
+        images = upscale(images, (H,W))
 
         #self.log_debug(f"{images.shape}, {gt.shape}, {img_preds.shape}")
         summary_image = torch.cat([images, gt, img_preds], 0)
@@ -85,9 +103,9 @@ class TBPredictionsCB(sh.callbacks.Callback):
         
 
 class TrainCB(sh.callbacks.Callback):
-    def __init__(self, logger=None): 
+    def __init__(self, logger=None, use_cuda=True): 
         sh.utils.store_attr(self, locals())
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.cuda.amp.GradScaler() if self.use_cuda else None
     
     @sh.utils.on_train
     def before_epoch(self):
@@ -98,7 +116,7 @@ class TrainCB(sh.callbacks.Callback):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
             
         xb,yb = self.batch
-        if self.kwargs['cfg'].TRAIN.AMP_LEVEL:
+        if self.kwargs['cfg'].TRAIN.AMP:
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
                 self.learner.loss = self.loss_func(self.preds, yb)
@@ -115,17 +133,21 @@ class TrainCB(sh.callbacks.Callback):
 
 
 
-def start(cfg, output_folder, n_epochs):
-    device = torch.cuda.current_device()
+def start(cfg, output_folder, n_epochs, use_cuda=True):
+    if use_cuda: device = torch.cuda.current_device()
     
-    datasets = build_datasets(num_proc=8)
-    dls = build_dataloaders(cfg, datasets, drop_last=True, pin=True)
+    datasets = build_datasets(cfg)
+
+    dls = build_dataloaders(cfg, datasets, samplers={'TRAIN':None}, pin=True, drop_last=False)
     
     model, opt = build_model(cfg)
+    if use_cuda: model = model.cuda()
+
     criterion = torch.nn.BCEWithLogitsLoss()
     
     ########## CALLBACKS #########
-    train_cb = TrainCB(logger=logger)
+    logger.log("DEBUG", 'INIT CALLBACKS') 
+    train_cb = TrainCB(logger=logger, use_cuda=use_cuda)
     
     if cfg.PARALLEL.IS_MASTER:
         models_dir = output_folder / 'models'
@@ -136,7 +158,7 @@ def start(cfg, output_folder, n_epochs):
         tb_metric_cb = partial(TBMetricCB, writer=writer, metrics={'totals':['total_loss', 'lr']}, )
         tb_predict_cb = partial(TBPredictionsCB, writer=writer, logger=logger, step=step)
 
-        tb_cbs = [tb_metric_cb(), tb_predict_cb()]
+        tb_cbs = [tb_metric_cb()]
         checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=1.)
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
@@ -148,14 +170,15 @@ def start(cfg, output_folder, n_epochs):
         [.25, sh.schedulers.sched_cos(l0,l1)],
         [.75, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
-    
-    cbs = [CudaCB(), train_cb, lrcb]
+    cbs = [CudaCB()] if use_cuda else []
+    cbs.extend([train_cb, lrcb])
         
     if cfg.PARALLEL.IS_MASTER:
         cbs.extend(master_cbs)
         epoch_bar = master_bar(range(n_epochs))
         batch_bar = partial(progress_bar, parent=epoch_bar)
     else: epoch_bar, batch_bar = range(n_epochs), lambda x:x
+    logger.log("DEBUG", 'LEARNER') 
 
     learner = sh.learner.Learner(model, opt, sh.utils.AttrDict(dls), criterion, 0, cbs, batch_bar, epoch_bar, cfg=cfg)
     learner.fit(n_epochs)

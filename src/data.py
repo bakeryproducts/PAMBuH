@@ -84,7 +84,10 @@ class TransformDataset:
     def __getitem__(self, idx):
         img, mask = self.dataset.__getitem__(idx)
         augmented = self.transforms(image=img, mask=mask)
-        return augmented["image"], augmented["mask"]
+        amask = augmented["mask"][0]# as binary
+        amask = amask.view(1,*amask.shape)
+
+        return augmented["image"], amask
     
     def __len__(self): return len(self.dataset)
 
@@ -191,6 +194,7 @@ def init_datasets(cfg):
     
     DATASETS = {
         "cuts512": SegmentDataset(DATA_DIR/'cuts512/imgs', DATA_DIR/'cuts512/masks'),
+        "cuts512_small": SegmentDataset(DATA_DIR/'cuts512_small/imgs', DATA_DIR/'cuts512_small/masks'),
     }
     return  DATASETS
 
@@ -236,8 +240,11 @@ def create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_l
     )
     return dl
 
-def build_dataloaders(datasets, samplers=None, batch_sizes=None, num_workers=1, drop_last=False, pin=False):
+def build_dataloaders(cfg, datasets, samplers=None, drop_last=False, pin=False):
     dls = {}
+    batch_sizes = {'TRAIN': cfg.TRAIN.BATCH_SIZE}
+    samplers = {'TRAIN':None}
+    num_workers = cfg.TRAIN.NUM_WORKERS
     for kind, dataset in datasets.items():
         sampler = samplers[kind]    
         shuffle = kind == 'TRAIN' if sampler is None else False

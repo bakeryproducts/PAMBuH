@@ -77,7 +77,7 @@ class ConcatDataset:
 
 
 class TransformDataset:
-    def __init__(self, dataset, transform):
+    def __init__(self, dataset, transforms):
         self.dataset = dataset
         self.transforms = albu.Compose([]) if transforms is None else transforms
     
@@ -116,8 +116,32 @@ def expander(x):
 
 def expander_float(x):
     x = np.array(x).astype(np.float32) / 255.
-    x = x.transpose(2,0,1)
-    return x if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=0), 3, 0)
+    return x if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=-1), 3, -1)
+
+def update_mean_std(cfg, mean, std):
+    was_frozen: False
+    if cfg.is_frozen():
+        cfg.defrost()
+        was_frozen = True
+        
+    cfg.TRANSFORMERS.MEAN = tuple(mean.tolist())
+    cfg.TRANSFORMERS.STD = tuple(std.tolist())
+    if was_frozen: cfg.freeze()
+        
+def mean_std_dataset(dataset, parts=200):
+    """
+    taking every step-th image of dataset, averaging mean and std on them
+    Image format is uint8, 0-255
+    """
+    mm, ss = [],[]
+    step = max(1,len(dataset) // parts)
+    for j, i in enumerate(dataset):
+        if j % step == 0:
+            d = i[0]/255.
+            mm.append(d.mean(axis=(0,1)))
+            ss.append(d.std(axis=(0,1)))
+            #break
+    return np.array(mm).mean(0), np.array(ss).mean(0)
 
 
 class SegmentDataset:
@@ -146,8 +170,10 @@ class SegmentDataset:
             mds = ImageDataset(maskf, '*.png')
             if self.mode_train:
                 # TODO CHANGE THIS BACK to expander, AUG DATASETS
-                ids.process_item = expander_float
+                ids.process_item = expander
                 mds.process_item = expander_float
+                #ids.process_item = expander_float
+                #mds.process_item = expander_float
             dss.append(PairDataset(ids, mds))
         
         self.dataset = ConcatDataset(dss)
@@ -164,20 +190,35 @@ def init_datasets(cfg):
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     
     DATASETS = {
-        "TRAIN": SegmentDataset(DATA_DIR/'train/imgs', DATA_DIR/'train/masks'),
+        "cuts512": SegmentDataset(DATA_DIR/'cuts512/imgs', DATA_DIR/'cuts512/masks'),
     }
     return  DATASETS
+
+def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST']):
+    converted_datasets = {}
+    for dataset_type in dataset_types:
+        data_field = cfg.DATA[dataset_type]
+        datasets_strings = data_field.DATASETS
+        if datasets_strings:
+            datasets = [all_datasets[ds] for ds in datasets_strings]
+            #ds = ConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
+            ds = datasets[0]
+            converted_datasets[dataset_type] = ds
+    return converted_datasets
 
 def build_datasets(cfg, mode_train=True):
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
     transform_factory = {
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
-            'TEST':{'factory': TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
+            'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
     
-    datasets = init_datasets(cfg)
-    
+    datasets = create_datasets(cfg, init_datasets(cfg))
+    mean, std = mean_std_dataset(datasets['TRAIN'])
+    if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
+        update_mean_std(cfg, mean, std)
+
     transforms = create_transforms(cfg, transform_factory)
     datasets = apply_transforms_datasets(datasets, transforms)
     return datasets

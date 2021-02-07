@@ -3,7 +3,7 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train']
+    DATASETS: ['cuts512']
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
@@ -24,7 +24,6 @@ TRANSFORMERS:
   RESIZE: [512, 512]
 
 TRAIN:
-  DOWNSCALE: 2
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   

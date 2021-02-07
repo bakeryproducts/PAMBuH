@@ -8,7 +8,6 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 from fastprogress.fastprogress import master_bar, progress_bar
-import matplotlib.pyplot as plt
 
 import shallow as sh
 import utils
@@ -48,9 +47,6 @@ class TBMetricCB(TrackResultsCB):
                 self.writer.add_scalar(category + '/' + metric, getattr(self, metric), self.n_epoch)
         self.writer.flush()
         
-class DummyCB(sh.callbacks.Callback):
-    def __init__(self): sh.utils.store_attr(self, locals())
-    
 class TBPredictionsCB(sh.callbacks.Callback):
     def __init__(self, writer, logger=None, step=1): sh.utils.store_attr(self, locals())
         
@@ -87,37 +83,6 @@ class TBPredictionsCB(sh.callbacks.Callback):
         
         self.writer.flush()
         
-class ValCB(sh.callbacks.Callback):
-    def __init__(self, logger=None): 
-        sh.utils.store_attr(self, locals())
-        self.eval_model = None
-        self.coco = CocoEval()
-        self.evals = []
-
-    @sh.utils.on_validation
-    def before_epoch(self):
-        self.lucky_numbers = np.random.choice(list(range(len(self.dl))), 3)
-        #self.log_debug(f'Indexies for val eval plots:{self.lucky_numbers}')
-        self.evals = []
-
-    def evaluate(self, x, y, h):
-        # all of them are in batch dim
-        # images, gt, heatmaps, predictions
-        # Do metric
-        metric = 42
-        SCALE = 2 # cfg downscale
-        mean, std = self.kwargs['cfg'].TRANSFORMERS.MEAN, self.kwargs['cfg'].TRANSFORMERS.STD 
-        return 42
-
-
-    @sh.utils.on_master
-    def val_step(self):
-        with torch.no_grad():
-            xb, yb = self.batch
-            hb = self.model(xb)
-            metric = self.evaluate(xb, yb, hb)
-            #self.log_debug(yb)
-
 
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
@@ -187,7 +152,6 @@ def start(cfg, output_folder, n_epochs):
     
     cbs = [CudaCB(), train_cb, lrcb]
         
-
     if cfg.PARALLEL.IS_MASTER:
         cbs.extend(master_cbs)
         epoch_bar = master_bar(range(n_epochs))

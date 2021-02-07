@@ -45,6 +45,14 @@ Data structure:
 3. Submit 
 ???
 
+4. pip package
+5. Actual research: 
+    cross-validate predictions on test data 
+    put each fold on kaggle
+    find worst test image
+
+
+
 n. Pipeline
 ```python
 datasets = build_datasets()

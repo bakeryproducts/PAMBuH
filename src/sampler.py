@@ -1,4 +1,5 @@
 import json
+from PIL import Image
 from typing import List, Tuple
 
 import numpy as np
@@ -60,3 +61,46 @@ class GdalSampler:
         del self._markups
         del self._masks
         del self._img
+
+
+def _write_block(block, name):
+    x, y, block_data = block
+    #print(name, x,y,block_data.shape, block_data.dtype)
+    t = Image.fromarray(block_data.transpose((1,2,0)))
+    t.save(f'output/{name}_{x}_{y}.png')
+
+def tif_block_read(name, block_size=None):
+    if block_size is None: block_size = (256, 256)
+    input_file, (W,H), _ = get_basics_rasterio(name)
+
+    nXBlocks, nYBlocks = _count_blocks(name, block_size=block_size)
+    nXValid, nYValid = block_size[0], block_size[1]
+    
+    for X in range(nXBlocks):
+        if X == nXBlocks - 1: nXValid = W - X * block_size[0]
+        myX = X * block_size[0]
+        nYValid = block_size[1]
+        for Y in range(nYBlocks):
+            if Y == nYBlocks - 1: nYValid = H - Y * block_size[1]
+            myY = Y * block_size[1]
+            
+            window = Window(myY, myX, nYValid, nXValid)
+            block = input_file.read([1,2,3], window=window)
+            #print(myX, myY, nXValid, nYValid, W, H, block.shape)
+
+            yield X, Y, block
+    del input_file
+
+
+def get_basics_rasterio(name):
+    file = rasterio.open(name)
+    return file, file.shape, file.count
+
+def _count_blocks(name, block_size=(256, 256)):
+    # find total x and y blocks to be read
+    _, dims, *_  = get_basics_rasterio(name)
+    nXBlocks = (int)((dims[0] + block_size[0] - 1) / block_size[0])
+    nYBlocks = (int)((dims[1] + block_size[1] - 1) / block_size[1])
+    return nXBlocks, nYBlocks
+
+

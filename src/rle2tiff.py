@@ -20,9 +20,9 @@ def rle2mask(mask_rle, shape):
     starts, lengths = [np.asarray(x, dtype=np.int32) for x in (s[0:][::2], s[1:][::2])]
     starts -= 1
     ends = starts + lengths
-    img = np.zeros(shape[0]*shape[1], dtype=np.int32)
+    img = np.zeros(shape[0]*shape[1], dtype=np.uint8)
     for lo, hi in zip(starts, ends):
-        img[lo:hi] = 1
+        img[lo:hi] = 255
     return img.reshape(shape).T
 
 
@@ -33,11 +33,11 @@ def mask2tiff(tiff_name, dir_input, dir_output):      # tiff_name = '1e2425f28'
     index_csv = info[info['image_file'] == tiff_name + '.tiff'].index.values
     width = int(info.iloc[index_csv, 1])
     height = int(info.iloc[index_csv, 2])
-    mask = rle2mask(train.iloc[index_rle, 1], (width, height)) * 255
+    mask = rle2mask(train.iloc[index_rle, 1], (width, height)) 
     #tifffile.imwrite(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", mask, photometric='minisblack')
     dst = rasterio.open(f"{dir_output}/{train.iloc[index_rle,0]}_mask.tiff", 'w', driver='GTiff', height=height,
                         width=width, count=1, nbits=1, dtype=np.uint8)
-    dst.write(mask.astype(np.uint8), 1)
+    dst.write(mask, 1)
     dst.close()
     del dst
 

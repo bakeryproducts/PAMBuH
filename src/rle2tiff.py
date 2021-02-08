@@ -47,7 +47,7 @@ def start(root, dst_path):
     for tiff_file in tqdm(tiff_files):
         _, (W,H), _ = utils.get_basics_rasterio(tiff_file)
         rle = get_rle_by_name(tiff_file.with_suffix('').name, root/'train.csv')
-        mask = rle2mask(rle, (W,H))
+        mask = rle2mask(rle, (H,W)).T
         print(tiff_file, W,H, mask.shape, mask.dtype, mask.max())
         save_mask(mask, dst_path / tiff_file.name)
 

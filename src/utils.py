@@ -6,10 +6,11 @@ from pathlib import Path
 from functools import partial
 from typing import Tuple, List, Dict, Callable
 
-import torch
 import cv2
-from shapely import geometry
+import torch
+import rasterio
 import numpy as np
+from shapely import geometry
 
 
 def jread(path: str) -> Dict:
@@ -91,3 +92,7 @@ def parse_args():
     parser.add_argument("--local_rank", default=0, type=int)
     args = parser.parse_args()
     return args
+
+def get_basics_rasterio(name):
+    file = rasterio.open(str(name))
+    return file, file.shape, file.count

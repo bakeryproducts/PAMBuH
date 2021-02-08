@@ -7,7 +7,7 @@ from shapely.geometry import Polygon
 import rasterio
 from rasterio.windows import Window
 
-from utils import jread
+from utils import jread, get_basics_rasterio
 
 
 class GdalSampler:
@@ -91,10 +91,6 @@ def tif_block_read(name, block_size=None):
             yield X, Y, block
     del input_file
 
-
-def get_basics_rasterio(name):
-    file = rasterio.open(name)
-    return file, file.shape, file.count
 
 def _count_blocks(name, block_size=(256, 256)):
     # find total x and y blocks to be read

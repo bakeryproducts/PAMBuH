@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torch.nn import init
-
+from torch.nn.parallel import DistributedDataParallel
 
 
 class conv_once(nn.Module):
@@ -218,6 +218,7 @@ def build_model(cfg):
     
     model = Unet(in_channels=3, out_channels=1)
     init_model(model)
+    model = model.cuda()
     
     opt = optim.AdamW
     opt_kwargs = {}

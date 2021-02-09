@@ -12,6 +12,7 @@ import rasterio
 import numpy as np
 from shapely import geometry
 
+from config import cfg
 
 def jread(path: str) -> Dict:
     with open(str(path), 'r') as f:
@@ -96,3 +97,12 @@ def parse_args():
 def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
+
+def cfg_frz(func):
+    def frz(*args, **kwargs):
+        cfg.defrost()
+        r = func(*args, **kwargs)
+        cfg.freeze()
+        return r 
+    return frz
+

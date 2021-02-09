@@ -3,12 +3,12 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['cuts512_small']
+    DATASETS: ['train512']
     GPU_PRELOAD: False
-    PRELOAD: False
+    PRELOAD: True
     CACHE: False
   VALID:
-    DATASETS: []
+    DATASETS: ['val512']
     PRELOAD: False
   TEST:
     DATASETS: []
@@ -20,27 +20,24 @@ TRANSFORMERS:
     AUG: 'test'
   TEST:
     AUG: 'test'
-  CROP: [512, 512]
+  CROP: [256, 256]
   RESIZE: [512, 512]
 
 TRAIN:
-  AMP: False
+  AMP: True
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
   SAVE_STEP: 50
   SCALAR_STEP: 1
-  TB_STEP: 20
+  TB_STEP: 3
   
   EPOCH_COUNT: 10
-  BATCH_SIZE: 4
+  BATCH_SIZE: 64
 VALID:
-  BATCH_SIZE: 1
+  BATCH_SIZE: 64
 TEST:
   BATCH_SIZE: 1
   
 PARALLEL:
-  DDP: False
-  IS_MASTER: True
-  LOCAL_RANK: 0
-  WORLD_SIZE: 1
+  DDP: True

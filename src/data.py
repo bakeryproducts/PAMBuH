@@ -16,6 +16,7 @@ import utils
 import augs
 from sampler import GdalSampler
 
+
 from _data import *
 #from _data import ImageDataset, PairDataset, ConcatDataset, expander, expander_float, mean_std_dataset, create_transforms, TransformDataset, update_mean_std
 
@@ -82,18 +83,23 @@ def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST'])
             converted_datasets[dataset_type] = ds
     return converted_datasets
 
-def build_datasets(cfg, mode_train=True):
+def build_datasets(cfg, mode_train=True, num_proc=4):
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
     transform_factory = {
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
-    
+
+    extend_factories = {
+             'PRELOAD':partial(PreloadingDataset, num_proc=num_proc, progress=tqdm),
+    }
+ 
     datasets = create_datasets(cfg, init_datasets(cfg))
     mean, std = mean_std_dataset(datasets['TRAIN'])
     if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
         update_mean_std(cfg, mean, std)
+    datasets = create_extensions(cfg, datasets, extend_factories)
 
     transforms = create_transforms(cfg, transform_factory)
     datasets = apply_transforms_datasets(datasets, transforms)

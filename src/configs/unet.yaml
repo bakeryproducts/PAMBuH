@@ -5,7 +5,7 @@ DATA:
   TRAIN:
     DATASETS: ['train512']
     GPU_PRELOAD: False
-    PRELOAD: True
+    PRELOAD: False
     CACHE: False
   VALID:
     DATASETS: ['val512']
@@ -32,7 +32,7 @@ TRAIN:
   SCALAR_STEP: 1
   TB_STEP: 3
   
-  EPOCH_COUNT: 10
+  EPOCH_COUNT: 50
   BATCH_SIZE: 64
 VALID:
   BATCH_SIZE: 64

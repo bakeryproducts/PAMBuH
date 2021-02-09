@@ -20,7 +20,6 @@ def set_gpus(cfg):
 @utils.cfg_frz
 def parallel_init():
     args = {}
-    
     try:
         args = parse_args()
     except SystemExit as e:
@@ -49,6 +48,11 @@ def init_output_folder(cfg):
         utils.dump_params(cfg, output_folder)
     return output_folder
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--local_rank", default=0, type=int)
+    args = parser.parse_args()
+    return args
 
 if __name__  == "__main__":
     cfg_init('src/configs/unet.yaml')

@@ -5,6 +5,8 @@ from collections import defaultdict
 
 import numpy as np
 
+import utils
+
 
 class Dataset:
     def __init__(self, root, pattern):
@@ -79,6 +81,52 @@ class TransformDataset:
         return augmented["image"], amask
     
     def __len__(self): return len(self.dataset)
+
+class PreloadingDataset:
+    def __init__(self, dataset, num_proc=False, progress=None):
+        self.dataset = dataset
+        self.num_proc = num_proc
+        self.progress = progress
+        if self.num_proc:
+            self.data = utils.mp_func_gen(self.preload_data,
+                                             range(len(self.dataset)),
+                                             n=self.num_proc,
+                                             progress=progress)
+        else:
+            self.data = self.preload_data(range(len(self.dataset)))
+        
+    def preload_data(self, args):
+        idxs = args
+        data = []
+        if self.progress is not None and not self.num_proc: idxs = self.progress(idxs)
+        for i in idxs:
+            r = self.dataset.__getitem__(i)
+            data.append(r)
+        return data
+    
+    def __getitem__(self, idx):
+        return self.data[idx]
+    
+    def __len__(self):
+        return len(self.data)
+
+
+def extend_dataset(ds, data_field, extend_factories):
+    for k, factory in extend_factories.items():
+        field_val = data_field.get(k, None) 
+        if field_val:
+            args = {}
+            if isinstance(field_val, dict): args.update(field_val)
+            ds = factory(ds, **args)
+    return ds
+
+def create_extensions(cfg, datasets, extend_factories):
+    extended_datasets = {}
+    for kind, ds in datasets.items():
+        extended_datasets[kind] = extend_dataset(ds, cfg.DATA[kind], extend_factories)
+    return extended_datasets
+
+
 
 def create_transforms(cfg,
                       transform_factories,

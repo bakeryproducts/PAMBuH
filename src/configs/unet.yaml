@@ -5,8 +5,9 @@ DATA:
   TRAIN:
     DATASETS: ['train512']
     GPU_PRELOAD: False
-    PRELOAD: False
+    PRELOAD: True
     CACHE: False
+    MULTIPLY: {'rate':5}
   VALID:
     DATASETS: ['val512']
     PRELOAD: False

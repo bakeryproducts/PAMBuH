@@ -93,6 +93,7 @@ def build_datasets(cfg, mode_train=True, num_proc=4):
 
     extend_factories = {
              'PRELOAD':partial(PreloadingDataset, num_proc=num_proc, progress=tqdm),
+             'MULTIPLY':MultiplyDataset,
     }
  
     datasets = create_datasets(cfg, init_datasets(cfg))

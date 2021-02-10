@@ -4,6 +4,7 @@ from functools import partial, reduce
 from collections import defaultdict
 
 import numpy as np
+from torch.utils.data.dataset import ConcatDataset as TorchConcatDataset
 
 import utils
 
@@ -43,6 +44,18 @@ class PairDataset:
     def __getitem__(self, idx):
         return self.ds1.__getitem__(idx), self.ds2.__getitem__(idx) 
 
+class MultiplyDataset:
+    def __init__(self, dataset, rate):
+        _dataset = TorchConcatDataset([dataset])
+        for i in range(rate-1):
+            _dataset += TorchConcatDataset([dataset])
+        self.dataset = _dataset
+        
+    def __getitem__(self, idx):
+        return self.dataset.__getitem__(idx)
+    
+    def __len__(self):
+        return len(self.dataset)
 
 class ConcatDataset:
     """

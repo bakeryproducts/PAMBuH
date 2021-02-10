@@ -1,15 +1,15 @@
+#from tqdm import tqdm
+from tqdm.notebook import tqdm
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from pathlib import Path
 from typing import NoReturn, Union
+import matplotlib.pyplot as plt
+from utils import create_dir, read_frame, save_tiff_uint8_single_band
+from sampler import get_basics_rasterio
 
-def read_frame(fd, x, y, h, w=None, c=3):
-	if w is None: w = h
-	img = fd.read(list(range(1, c+1)), window=Window(x, y, h, w))
-	return torch.ByteTensor(img)
-
-def block_reader(path, inf, size=512, infer_list_flg=False):
+def block_reader(path : str, inf, size : int =512, infer_list_flg : bool =False) -> torch.Tensor:
 	fd, shape, channel = get_basics_rasterio(path)
 	
 	rows = []
@@ -36,7 +36,7 @@ def block_reader(path, inf, size=512, infer_list_flg=False):
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
 	return torch.cat(rows, 0)[:shape[0], :shape[1]]
 
-def prt(img):
+def plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)
 	if len(img.shape) == 2:
 		plt.imshow(np.array(img))
@@ -44,20 +44,7 @@ def prt(img):
 		plt.imshow(np.array(img).transpose(1, 2, 0))
 	plt.show()
 
-def save_tiff_uint8_single_band(img, path):
-	if isinstance(img, torch.Tensor):
-		img = np.array(img)
-	elif not isinstance(img, numpy.ndarray):
-		raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
-	assert img.dtype == np.uint8
-	h, w = img.shape
-	dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
-	dst.write(img, 1) # 1 band
-	dst.close()
-	print(f'Save to {path}')
-	del dst
-
-def postprocess(infer_func, src_folder, dst_folder, save_predicts=True):
+def postprocess(infer_func, src_folder : str, dst_folder : str, return_img : bool =False) -> Union[torch.Tensor, None]:
 	"""
 	infer_func([BxCxHxV]) -> [BxCxHxV]
 	src_folder - folder with test images
@@ -67,8 +54,11 @@ def postprocess(infer_func, src_folder, dst_folder, save_predicts=True):
 	create_dir(dst_folder)
 	for img_name in tqdm(imgs_name, desc='Images', leave=False):
 		img = block_reader(img_name, infer_func)
-		save_tiff_uint8_single_band(img, Path(dst_folder) / img_name.name)
-
+		if return_img:
+			return img
+		else:
+			save_tiff_uint8_single_band(img, Path(dst_folder) / img_name.name)
+			
 class SmoothTiles:
 	def __init__(self, window_fun: str ='triangle', cuda: bool = True) -> NoReturn:
 		self.window_fun_name = window_fun

@@ -26,6 +26,8 @@ class Augmentator:
         elif kind == 'test': return self.aug_test ()
         elif kind == 'light': return self.aug_light()
         elif kind == 'blank': return self.aug_blank()
+        elif kind == 'resize': return self.resize()
+        elif kind == 'wocrop': return self.aug_wocrop()
         else: raise Exception(f'Unknown aug : {kind}')
         
     def norm(self): return self.compose([albu.Normalize(mean=self.mean, std=self.std), ToTensor()])
@@ -43,6 +45,7 @@ class Augmentator:
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_test(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])
+    def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])
 
 

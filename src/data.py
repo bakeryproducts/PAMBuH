@@ -99,8 +99,8 @@ def build_datasets(cfg, mode_train=True, num_proc=4):
     mean, std = mean_std_dataset(datasets['TRAIN'])
     if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
         update_mean_std(cfg, mean, std)
-    datasets = create_extensions(cfg, datasets, extend_factories)
 
+    datasets = create_extensions(cfg, datasets, extend_factories)
     transforms = create_transforms(cfg, transform_factory)
     datasets = apply_transforms_datasets(datasets, transforms)
     return datasets

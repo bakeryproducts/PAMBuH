@@ -28,7 +28,6 @@ class CudaCB(sh.callbacks.Callback):
 
     def before_fit(self): self.model.cuda()
 
-
 class TrackResultsCB(sh.callbacks.Callback):
     def before_epoch(self): 
         self.accs,self.losses,self.samples_count = [],[],[]
@@ -70,7 +69,6 @@ class TBMetricCB(TrackResultsCB):
         
     def after_epoch_valid(self):
         #self.log_debug('tb metric after validation')
-        # TODO DICE
         self.parse_metrics(self.validation_metrics)
 
     def after_epoch(self):

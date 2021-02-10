@@ -72,6 +72,7 @@ _____________
     - Docker
     - LR sched fix
     - oversampling ?
+    - DUMP CFG AFTER BUILD
 
 
 

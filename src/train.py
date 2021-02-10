@@ -28,6 +28,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     val_cb = ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
+        utils.dump_params(cfg, output_folder)
         models_dir = output_folder / 'models'
         tb_dir = output_folder / 'tb'
         step = cfg.TRAIN.TB_STEP

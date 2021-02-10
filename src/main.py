@@ -46,7 +46,7 @@ def init_output_folder(cfg):
         output_folder = utils.make_folders(cfg)
         shutil.copytree('src', str(output_folder/'src'))
         #if os.path.exists('/mnt/src'): shutil.copytree('/mnt/src', str(output_folder/'src'))
-        utils.dump_params(cfg, output_folder)
+        #utils.dump_params(cfg, output_folder)
     return output_folder
 
 def parse_args():

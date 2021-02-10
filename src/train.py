@@ -41,7 +41,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
         tb_predict_cb = partial(TBPredictionsCB, writer=writer, logger=logger, step=step)
 
         tb_cbs = [tb_metric_cb(), tb_predict_cb()]
-        checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=1.)
+        checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=cfg.TRAIN.SAVE_STEP)
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
@@ -63,7 +63,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     else: epoch_bar, batch_bar = range(n_epochs), lambda x:x
     logger.log("DEBUG", 'LEARNER') 
 
-    val_interval = 5
+    val_interval = cfg.VALID.STEP
 
     learner = sh.learner.Learner(model, opt, sh.utils.AttrDict(dls), criterion, 0, cbs, batch_bar, epoch_bar, val_interval, cfg=cfg)
     learner.fit(n_epochs)

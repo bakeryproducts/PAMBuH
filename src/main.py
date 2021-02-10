@@ -18,13 +18,14 @@ def set_gpus(cfg):
         logger.warning(f'WARNING, GPUS already set in env: CUDA_VISIBLE_DEVICES = {os.environ.get("CUDA_VISIBLE_DEVICES")}')
       
 @utils.cfg_frz
-def parallel_init():
-    args = {}
-    try:
-        args = parse_args()
-    except SystemExit as e:
+def parallel_init(args=None):
+    if args is None:
+        # TODO kinda stupid...
         logger.warning('Couldnt trace args (run in jupyter?), starting local initialization')
-        class args: local_rank=0
+        class args: 
+            local_rank=0
+            #cfg = 'src/configs/unet.yaml'
+
     cfg.PARALLEL.LOCAL_RANK = args.local_rank 
     cfg.PARALLEL.IS_MASTER = cfg.PARALLEL.LOCAL_RANK == 0 
         
@@ -51,13 +52,16 @@ def init_output_folder(cfg):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", default=0, type=int)
+    parser.add_argument("--cfg", default='src/configs/unet.yaml', type=str)
     args = parser.parse_args()
     return args
 
 if __name__  == "__main__":
-    cfg_init('src/configs/unet.yaml')
+    args = parse_args()
+    cfg_init(args.cfg)
     set_gpus(cfg)
-    parallel_init()
+    parallel_init(args)
+
     if cfg.PARALLEL.IS_MASTER: logger.debug('\n' + cfg.dump(indent=4))
     output_folder = init_output_folder(cfg)
     log_init(output_folder)

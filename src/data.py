@@ -131,7 +131,8 @@ def build_dataloaders(cfg, datasets, samplers=None, drop_last=False, pin=False):
                                                                     num_replicas=cfg.PARALLEL.WORLD_SIZE,
                                                                     rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
         sampler = samplers[kind]    
-        shuffle = kind == 'TRAIN' if sampler is None else False
+        #shuffle = kind == 'TRAIN' if sampler is None else False
+        shuffle = sampler is None
         batch_size = batch_sizes[kind] if batch_sizes[kind] is not None else 1
         dls[kind] = create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_last, pin)
             

@@ -34,22 +34,27 @@ class TrackResultsCB(sh.callbacks.Callback):
         
     def after_epoch(self):
         n = sum(self.samples_count)
-        print(self.n_epoch, self.model.training, sum(self.losses).item()/n, sum(self.accs).item()/n)
+        print(self.n_epoch, self.model.training, sum(self.losses)/n, sum(self.accs)/n)
         
     def after_batch(self):
         xb, yb = self.batch
-        acc = 1#(self.preds.argmax(dim=1)==yb).float().sum()
-        self.accs.append(acc)
-        n = len(xb)
-        self.losses.append(self.loss*n)
+        n = xb.shape[0]
+        #print(self.preds.shape, yb.shape, xb.shape)
+        dice = dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+        #print(n, dice, dice*n)
+        self.accs.append(dice*n)
         self.samples_count.append(n)
+        if self.model.training:
+            self.losses.append(self.loss.detach().item()*n)
 
 
 def dice_loss(inp, target, eps=1e-6):
-    a = inp.contiguous().view(-1)
-    b = target.contiguous().view(-1)
-    intersection = (a * b).sum()
-    return ((2. * intersection + eps) / (a.sum() + b.sum() + eps))
+    with torch.no_grad():
+        a = inp.contiguous().view(-1)
+        b = target.contiguous().view(-1)
+        intersection = (a * b).sum()
+        dice = ((2. * intersection + eps) / (a.sum() + b.sum() + eps)) 
+        return dice.item()
 
 
 class TBMetricCB(TrackResultsCB):
@@ -71,11 +76,13 @@ class TBMetricCB(TrackResultsCB):
 
     def after_epoch_train(self):
         #self.log_debug('tb metric after train epoch')
-        self.train_loss = sum(self.losses).item() / sum(self.samples_count)
+        self.train_loss = sum(self.losses) / sum(self.samples_count)
+        self.train_dice =  sum(self.accs) / sum(self.samples_count)
         self.parse_metrics(self.train_metrics)
         
     def after_epoch_valid(self):
         #self.log_debug('tb metric after validation')
+        self.valid_dice =  sum(self.accs) / sum(self.samples_count)
         self.parse_metrics(self.validation_metrics)
 
     def after_epoch(self):
@@ -153,5 +160,34 @@ class TrainCB(sh.callbacks.Callback):
             self.learner.opt.step()
             
         self.learner.opt.zero_grad()
+
+class ValCB(sh.callbacks.Callback):
+    def __init__(self, logger=None):
+        sh.utils.store_attr(self, locals())
+        self.evals = []
+ 
+    @sh.utils.on_validation
+    def before_epoch(self):
+        self.lucky_numbers = np.random.choice(list(range(len(self.dl))), 3)
+        #self.log_debug(f'Indexies for val eval plots:{self.lucky_numbers}')
+        self.evals = []
+        self.learner.metrics = []
+
+    def evaluate(self, xb, yb, preds):
+        # all of them are in batch dim
+        if self.n_batch in self.lucky_numbers:
+            pass
+        return metric
+                
+    @sh.utils.on_master
+    def val_step(self):
+        with torch.no_grad():
+            #self.log_debug('VALSTEP')
+            xb, yb = self.batch
+            self.learner.preds = self.model(xb)
+            #metric = self.evaluate(xb, yb, preds)
+
+
+
 
 

@@ -25,6 +25,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     
     logger.log("DEBUG", 'INIT CALLBACKS') 
     train_cb = TrainCB(logger=logger, use_cuda=use_cuda)
+    val_cb = ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
         models_dir = output_folder / 'models'
@@ -34,8 +35,8 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
         
         tb_metric_cb = partial(TBMetricCB, 
                                writer=writer,
-                               train_metrics={'losses':['train_loss'], 'general':['lr']}, 
-                               validation_metrics={'losses':['val_loss'], 'general':['dice']})
+                               train_metrics={'losses':['train_loss'], 'general':['lr', 'train_dice']}, 
+                               validation_metrics={'losses':['val_loss'], 'general':['valid_dice']})
 
         tb_predict_cb = partial(TBPredictionsCB, writer=writer, logger=logger, step=step)
 
@@ -45,15 +46,15 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
     l0,l1,l2 = 5e-5, 5e-4,5e-5
-    scale = .8#1 / cfg.PARALLEL.WORLD_SIZE
+    scale = 1 #1/ cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.25, sh.schedulers.sched_cos(l0,l1)],
-        [.75, sh.schedulers.sched_cos(l1,l2)]])
+        [.05, sh.schedulers.sched_cos(l0,l1)],
+        [.95, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
     cbs = [CudaCB()] if use_cuda else []
-    cbs.extend([train_cb, lrcb])
+    cbs.extend([train_cb, val_cb, lrcb])
         
     if cfg.PARALLEL.IS_MASTER:
         cbs.extend(master_cbs)

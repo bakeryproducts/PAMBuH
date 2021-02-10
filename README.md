@@ -70,7 +70,8 @@ _____________
     - validation TB fix 
     - train blows out
     - Docker
-    - 
+    - LR sched fix
+    - oversampling ?
 
 
 

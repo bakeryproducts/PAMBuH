@@ -45,13 +45,13 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
-    l0,l1,l2 = 5e-5, 5e-4,5e-5
+    l0,l1,l2 = 5e-5, 3e-4,5e-5
     scale = 1 #1/ cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.05, sh.schedulers.sched_cos(l0,l1)],
-        [.95, sh.schedulers.sched_cos(l1,l2)]])
+        [.1, sh.schedulers.sched_cos(l0,l1)],
+        [.9, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
     cbs = [CudaCB()] if use_cuda else []
     cbs.extend([train_cb, val_cb, lrcb])

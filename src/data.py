@@ -68,6 +68,9 @@ def init_datasets(cfg):
         "cuts512": SegmentDataset(DATA_DIR/'cuts512/imgs', DATA_DIR/'cuts512/masks'),
         "train512": SegmentDataset(DATA_DIR/'split512_1/train/imgs', DATA_DIR/'split512_1/train/masks'),
         "val512": SegmentDataset(DATA_DIR/'split512_1/val/imgs', DATA_DIR/'split512_1/val/masks'),
+
+        "train1024x05": SegmentDataset(DATA_DIR/'split1024x05/train/imgs', DATA_DIR/'split1024x05/train/masks'),
+        "val1024x05": SegmentDataset(DATA_DIR/'split1024x05/val/imgs', DATA_DIR/'split1024x05/val/masks'),
     }
     return  DATASETS
 

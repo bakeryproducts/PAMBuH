@@ -3,22 +3,22 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train512']
+    DATASETS: ['train1024x05']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
     MULTIPLY: {'rate':5}
   VALID:
-    DATASETS: ['val512']
+    DATASETS: ['val1024x05']
     PRELOAD: False
   TEST:
     DATASETS: []
 
 TRANSFORMERS:
   TRAIN:
-    AUG: 'wocrop'
+    AUG: 'light'
   VALID:
-    AUG: 'test'
+    AUG: 'val'
   TEST:
     AUG: 'test'
   CROP: [256, 256]

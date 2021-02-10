@@ -41,13 +41,14 @@ class Augmentator:
     
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
 
-    def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
-    def aug_test(self): return self.compose([self.resize(), self.norm()])
+
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])
+    def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
+
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])
-
+    def aug_test(self): return self.compose([self.resize(), self.norm()])
 
 def get_aug(aug_type, transforms_cfg):
     """ aug_type (str): one of `val`, `test`, `light`, `medium`, `hard`

@@ -4,13 +4,17 @@ import argparse
 import datetime
 from pathlib import Path
 from functools import partial
+import multiprocessing as mp
+from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
 
-import torch
 import cv2
-from shapely import geometry
+import torch
+import rasterio
 import numpy as np
+from shapely import geometry
 
+from config import cfg
 
 def jread(path: str) -> Dict:
     with open(str(path), 'r') as f:
@@ -91,3 +95,38 @@ def parse_args():
     parser.add_argument("--local_rank", default=0, type=int)
     args = parser.parse_args()
     return args
+
+def get_basics_rasterio(name):
+    file = rasterio.open(str(name))
+    return file, file.shape, file.count
+
+def cfg_frz(func):
+    def frz(*args, **kwargs):
+        cfg.defrost()
+        r = func(*args, **kwargs)
+        cfg.freeze()
+        return r 
+    return frz
+
+@contextmanager
+def poolcontext(*args, **kwargs):
+    pool = mp.Pool(*args, **kwargs)
+    yield pool
+    pool.terminate()
+    
+def mp_func(foo, args, n):
+    args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
+    with poolcontext(processes=n) as pool:
+        res = pool.map(foo, args_chunks)
+    return [ri for r in res for ri in r]
+
+
+def mp_func_gen(foo, args, n, progress=None):
+    args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
+    results = []
+    with poolcontext(processes=n) as pool:
+        gen = pool.imap(foo, args_chunks)
+        if progress is not None: gen = progress(gen, total=len(args_chunks))
+        for r in gen:
+            results.extend(r)
+    return results

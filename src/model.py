@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torch.nn import init
-
+from torch.nn.parallel import DistributedDataParallel
 
 
 class conv_once(nn.Module):
@@ -211,13 +211,16 @@ def init_model(model):
             if m.bias is not None: m.bias.data.zero_()
     model._layer_init()
 
+def model_select():
+    return Unet
 
 def build_model(cfg):
     base_lr = 1e-4# should be overriden in LR scheduler anyway
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
-    model = Unet(in_channels=3, out_channels=1)
+    model = model_select()(in_channels=3, out_channels=1)
     init_model(model)
+    model = model.cuda()
     
     opt = optim.AdamW
     opt_kwargs = {}
@@ -228,5 +231,22 @@ def build_model(cfg):
     
     return model, optimizer
 
-def load_model(path):
-    raise NotImplementedError
+def load_model(cfg, path):
+    # model_select syncing build and load, probably should be in cfg, by key as in datasets
+    model = model_select()(in_channels=3, out_channels=1)
+    
+    state_dict = torch.load(path)['model_state']
+    # Strip ddp model TODO dont save it like that
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        if k.startswith('module'):
+            k = k.lstrip('module')[1:]
+        new_state_dict[k] = v
+    del state_dict
+    
+    model.load_state_dict(new_state_dict)
+    del new_state_dict
+    
+    model.eval()
+    return model
+

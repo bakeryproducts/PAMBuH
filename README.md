@@ -36,16 +36,13 @@ Data structure:
 
 2. PostProcess
 _______________
-Module
-postprocess.py
+# Module postprocess
+```python
 from postprocess import postrocess
 
 postprocess(infer_func, src_folder, dst_folder, save_predicts=True)
-    '''
         src_folder - folder with test images
         dst_folder - folder to save output (RLE and predictions)
-
-    '''
 
 for image in test_images:
     mirror_pad(image)
@@ -56,8 +53,9 @@ for image in test_images:
 
     save_raster
     save_rle
-
+```
 _____________
+
 3. Submit 
 ???
 

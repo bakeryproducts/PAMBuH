@@ -35,13 +35,29 @@ Data structure:
         ...
 
 2. PostProcess
- - cut test image on grid
- - predict on Patches
- - cut test image on overlapping grid
- - predict on Patches
- - join predictions
- - RLE
+_______________
+Module
+postprocess.py
+from postprocess import postrocess
 
+postprocess(infer_func, src_folder, dst_folder, save_predicts=True)
+    '''
+        src_folder - folder with test images
+        dst_folder - folder to save output (RLE and predictions)
+
+    '''
+
+for image in test_images:
+    mirror_pad(image)
+    for block in padded_image:
+        prediction = infer_func(block)
+        valid_part = crop_center(prediction)
+        result_image.insert(valid_part)
+
+    save_raster
+    save_rle
+
+_____________
 3. Submit 
 ???
 
@@ -50,6 +66,13 @@ Data structure:
     cross-validate predictions on test data 
     put each fold on kaggle
     find worst test image
+6. COde based:
+    - DICE
+    - load model
+    - validation TB fix 
+    - train blows out
+    - Docker
+    - 
 
 
 

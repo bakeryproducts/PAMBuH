@@ -45,6 +45,13 @@ class TrackResultsCB(sh.callbacks.Callback):
         self.samples_count.append(n)
 
 
+def dice_loss(inp, target, eps=1e-6):
+    a = inp.contiguous().view(-1)
+    b = target.contiguous().view(-1)
+    intersection = (a * b).sum()
+    return ((2. * intersection + eps) / (a.sum() + b.sum() + eps))
+
+
 class TBMetricCB(TrackResultsCB):
     def __init__(self, writer, train_metrics=None, validation_metrics=None, logger=None):
         ''' train_metrics = {'losses':['train_loss', 'val_loss']}

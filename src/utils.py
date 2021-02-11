@@ -16,6 +16,7 @@ from shapely import geometry
 
 from config import cfg
 
+
 def jread(path: str) -> Dict:
     with open(str(path), 'r') as f:
         data = json.load(f)
@@ -53,19 +54,24 @@ def polyg_to_mask(polyg: np.ndarray, wh: Tuple[int, int], fill_value: int) -> np
     return mask
 
 
-def json_record_to_poly(record: List) -> List:
-    coords = record['geometry']['coordinates'][0] # 0 as in first part of multipart poly
-    try: poly = geometry.Polygon(coords)
-    except Exception as e: print(e, coords)
-    return poly
-
-
-def create_dir(path: str) -> None:
-    """ Create directory if ot existed.
+def json_record_to_poly(record: Dict) -> List[geometry.Polygon]:
+    """Get list of polygs from record.
     """
 
-    if not os.path.isdir(path):
-        os.makedirs(path)
+    num_polygs = len(record['geometry']['coordinates'])
+    if num_polygs == 1:     # Polygon
+        list_coords = [record['geometry']['coordinates'][0]]
+    elif num_polygs > 1:    # MultiPolygon
+        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygs)]
+    else:
+        raise Exception("No polygons are found")
+
+    try:
+        polygs = [geometry.Polygon(coords) for coords in list_coords]
+    except Exception as e:
+        print(e, list_coords)
+    return polygs
+
 
 def make_folders(cfg):
     cfg_postfix = 'PAMBUH'
@@ -79,41 +85,49 @@ def make_folders(cfg):
     os.makedirs(models_dir, exist_ok=True)
     tb_dir = fname / 'tb'
     os.makedirs(tb_dir, exist_ok=True)
-    
+
     return fname
+
 
 def save_models(d, postfix, output_folder):
     for k, v in d.items():
-        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl")) 
+        torch.save(v.state_dict(), output_folder / os.path.join("models", f"{k}_{postfix}.pkl"))
+
 
 def dump_params(cfg, output_path):
     with open(os.path.join(output_path, 'cfg.yaml'), 'w') as f:
         f.write(cfg.dump())
-        
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", default=0, type=int)
     args = parser.parse_args()
     return args
 
+
 def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
+
 
 def cfg_frz(func):
     def frz(*args, **kwargs):
         cfg.defrost()
         r = func(*args, **kwargs)
         cfg.freeze()
-        return r 
+        return r
+
     return frz
+
 
 @contextmanager
 def poolcontext(*args, **kwargs):
     pool = mp.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
-    
+
+
 def mp_func(foo, args, n):
     args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
     with poolcontext(processes=n) as pool:
@@ -130,3 +144,14 @@ def mp_func_gen(foo, args, n, progress=None):
         for r in gen:
             results.extend(r)
     return results
+
+
+def get_cortex_polygs(anot_structs_json: Dict) -> List[geometry.Polygon]:
+    """ Get list of cortex polygons from anot_structs_json.
+    """
+
+    cortex_polygs = []
+    for record in anot_structs_json:
+        if record['properties']['classification']['name'] == 'Cortex':
+            cortex_polygs += json_record_to_poly(record)
+    return cortex_polygs

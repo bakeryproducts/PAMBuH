@@ -7,7 +7,7 @@ from functools import partial
 import multiprocessing as mp
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
-
+from rasterio.windows import Window
 import cv2
 import torch
 import rasterio
@@ -119,7 +119,6 @@ def read_frame(fd, x, y, h, w=None, c=3):
     return torch.ByteTensor(img)# TORCH BYTE TENSOR??? read_frame should be get_tiff_block_by_coordinates_and_convert_to_byte_tensor???
 
 def save_tiff_uint8_single_band(img, path):
-    # NAHUYA SOHRANYALKE TIFF FILOV vpizdu koroch 
     if isinstance(img, torch.Tensor):
         img = np.array(img)
     elif not isinstance(img, numpy.ndarray):
@@ -127,7 +126,7 @@ def save_tiff_uint8_single_band(img, path):
     assert img.dtype == np.uint8
     h, w = img.shape
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
-    dst.write(img, 1) # 1 band
+    dst.write(img, 1)
     dst.close()
     print(f'Save to {path}') 
     del dst

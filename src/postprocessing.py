@@ -1,5 +1,4 @@
-# TWO TABS INDENT? WTF
-
+import os
 #from tqdm import tqdm
 from tqdm.notebook import tqdm
 import numpy as np
@@ -8,15 +7,15 @@ import torch.nn.functional as F
 from pathlib import Path
 from typing import NoReturn, Union
 import matplotlib.pyplot as plt
-from utils import create_dir, read_frame, save_tiff_uint8_single_band
+from utils import read_frame, save_tiff_uint8_single_band
 from sampler import get_basics_rasterio
 
-def block_reader(path : str, inf, size : int =512, infer_list_flg : bool =False) -> torch.Tensor:
-    # WTF break it down for:
-    # 1. actual tiff image block reader, with block_size and step 
-    # 2. processing part with infer_func. Infer func should take List of images, CHW, uint8
-    #    as it returns from simple fd.read()
-        
+def read_and_process_img(path : str, inf, size : int =512, infer_list_flg : bool =False) -> torch.Tensor:
+	# WTF break it down for:
+	# 1. actual tiff image block reader, with block_size and step 
+	# 2. processing part with infer_func. Infer func should take List of images, CHW, uint8
+	#    as it returns from simple fd.read()
+
 	fd, shape, channel = get_basics_rasterio(path)
 	
 	rows = []
@@ -43,8 +42,7 @@ def block_reader(path : str, inf, size : int =512, infer_list_flg : bool =False)
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
 	return torch.cat(rows, 0)[:shape[0], :shape[1]]
 
-def plot_img(img: np.ndarray) -> NoReturn:
-    # if this is not crucial, make it like _plot_img
+def _plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)
 	if len(img.shape) == 2:
 		plt.imshow(np.array(img))
@@ -52,31 +50,26 @@ def plot_img(img: np.ndarray) -> NoReturn:
 		plt.imshow(np.array(img).transpose(1, 2, 0))
 	plt.show()
 
-def postprocess(infer_func, src_folder : str, dst_folder : str, return_img : bool =False) -> Union[torch.Tensor, None]:
-    # wtf , postprocess_test_folder
-
+def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> Union[torch.Tensor, None]:
 	"""
 	infer_func([BxCxHxV]) -> [BxCxHxV] # this is wrong, wtf is V? , list(img1, img2, ...) -> torch.tensor
 	src_folder - folder with test images
 	dst_folder - folder to save output (RLE and predictions)
 
         wtf with return_img? postprocess should be able of optionally save binary masks to tiff files 
-
 	"""
 	imgs_name = Path(src_folder).glob('*.tiff')
-	create_dir(dst_folder)# wtf os.makedirs (exists_ok)
-	for img_name in tqdm(imgs_name, desc='Images', leave=False): # Images? at least Test images
-		img = block_reader(img_name, infer_func) # wtf? mask = read_and_process_img(name, process_func)
-		if return_img:
-			return img # wtf??
-		else:
-			save_tiff_uint8_single_band(img, Path(dst_folder) / img_name.name)
+	dst_folder = Path(dst_folder)
+	dst_folder.mkdir(parents=True, exist_ok=True)
+	for img_name in tqdm(imgs_name, desc='Test images', leave=False):
+		#img = block_reader(img_name, infer_func)
+		mask = read_and_process_img(img_name, infer_func)
+		save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
 			
 class SmoothTiles:
-    '''
-        _SmoothTiles ?
-
-    '''
+	'''
+	_SmoothTiles ?
+	'''
 	def __init__(self, window_fun: str ='triangle', cuda: bool = True) -> NoReturn:
 		self.window_fun_name = window_fun
 		self.get_window_fun()

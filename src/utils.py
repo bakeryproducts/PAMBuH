@@ -164,3 +164,15 @@ def get_cortex_polygs(anot_structs_json: Dict) -> List[geometry.Polygon]:
         if record['properties']['classification']['name'] == 'Cortex':
             cortex_polygs += json_record_to_poly(record)
     return cortex_polygs
+
+def tiff_merge_mask(path_tiff, path_mask, path_dst):
+    # will use shitload of mem
+    img = rasterio.open(path_tiff).read()
+    mask = rasterio.open(path_mask).read()
+    assert mask.max() <= 1 + 1e-6 
+    img[1,...] = mask*200
+    _, h, w = img.shape
+    dst = rasterio.open(path_dst, 'w', driver='GTiff', height=h, width=w, count=3, dtype=np.uint8)
+    dst.write(img, [1,2,3]) # 3 bands
+    dst.close()
+    del dst

@@ -1,4 +1,3 @@
-import os
 #from tqdm import tqdm
 from tqdm.notebook import tqdm
 import numpy as np
@@ -34,7 +33,7 @@ def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
 		infer_batch = inf(imgs_batch)
 		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
-	return torch.cat(rows, 0)[:shape[0], :shape[1]]
+	return np.uint8(torch.cat(rows, 0)[:shape[0], :shape[1]]*255)
 
 def _plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)
@@ -44,7 +43,7 @@ def _plot_img(img: np.ndarray) -> NoReturn:
 		plt.imshow(np.array(img).transpose(1, 2, 0))
 	plt.show()
 
-def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> Union[torch.Tensor, None]:
+def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> NoReturn:
 	"""
 	infer_func(list(img1, img2, ...) -> [BxCxHxW]
 	src_folder - folder with test images
@@ -56,7 +55,7 @@ def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> U
 	for img_name in tqdm(imgs_name, desc='Test images', leave=False):
 		mask = read_and_process_img(img_name, infer_func)
 		save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
-		jdump(mask2rle(mask), mask.stem + '.json')
+		jdump(mask2rle(mask), dst_folder / img_name.stem + '.json')
 			
 class SmoothTiles:
 	def __init__(self, window_fun: str ='triangle', cuda: bool = True) -> NoReturn:

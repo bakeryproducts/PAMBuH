@@ -113,7 +113,7 @@ def get_tiff_block(ds, x, y, h, w=None, bands=3):
 def save_tiff_uint8_single_band(img, path):
     if isinstance(img, torch.Tensor):
         img = np.array(img)
-    elif not isinstance(img, numpy.ndarray):
+    elif not isinstance(img, np.ndarray):
         raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
     assert img.dtype == np.uint8
     h, w = img.shape

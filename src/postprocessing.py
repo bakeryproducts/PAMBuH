@@ -9,8 +9,9 @@ from typing import NoReturn, Union
 import matplotlib.pyplot as plt
 from utils import read_frame, save_tiff_uint8_single_band
 from sampler import get_basics_rasterio
+from rle2tiff import mask2rle
 
-def read_and_process_img(path : str, inf, size : int =512, infer_list_flg : bool =False) -> torch.Tensor:
+def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
 	# WTF break it down for:
 	# 1. actual tiff image block reader, with block_size and step 
 	# 2. processing part with infer_func. Infer func should take List of images, CHW, uint8
@@ -27,17 +28,18 @@ def read_and_process_img(path : str, inf, size : int =512, infer_list_flg : bool
 			pad = (size//4, size - shape[1]%size, 0, size + ny - shape[0])
 		row = read_frame(fd, 0, ny, shape[1], size)
 		row_img = F.pad(row, pad=pad, mode='constant', value=0)
-		row_img = row_img.unsqueeze(0)
-		left_i = torch.split(row_img, size, dim=3)[:-1]
-		right_i = torch.split(row_img[:, :, :, size//4:], size, dim=3)
+		
+		#row_img = row_img.unsqueeze(0)
+		#left_i = torch.split(row_img, size, dim=3)[:-1]
+		#right_i = torch.split(row_img[:, :, :, size//4:], size, dim=3)
+		left_i = torch.split(row_img, size, dim=2)[:-1]
+		right_i = torch.split(row_img[:, :, size//4:], size, dim=2)
 
 		imgs_batch = []
 		for i in range(len(left_i)):
 			imgs_batch.extend([left_i[i], right_i[i]])
-		if infer_list_flg:
-			infer_batch = inf(imgs_batch)
-		else:
-			infer_batch = inf(torch.cat(imgs_batch, 0))
+		#infer_batch = inf(torch.cat(imgs_batch, 0))
+		infer_batch = inf(imgs_batch)
 		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
 	return torch.cat(rows, 0)[:shape[0], :shape[1]]
@@ -52,24 +54,19 @@ def _plot_img(img: np.ndarray) -> NoReturn:
 
 def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> Union[torch.Tensor, None]:
 	"""
-	infer_func([BxCxHxV]) -> [BxCxHxV] # this is wrong, wtf is V? , list(img1, img2, ...) -> torch.tensor
+	infer_func(list(img1, img2, ...) -> [BxCxHxW]
 	src_folder - folder with test images
 	dst_folder - folder to save output (RLE and predictions)
-
-        wtf with return_img? postprocess should be able of optionally save binary masks to tiff files 
 	"""
 	imgs_name = Path(src_folder).glob('*.tiff')
 	dst_folder = Path(dst_folder)
 	dst_folder.mkdir(parents=True, exist_ok=True)
 	for img_name in tqdm(imgs_name, desc='Test images', leave=False):
-		#img = block_reader(img_name, infer_func)
 		mask = read_and_process_img(img_name, infer_func)
 		save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
+		jdump(mask2rle(mask), mask.stem + '.json')
 			
 class SmoothTiles:
-	'''
-	_SmoothTiles ?
-	'''
 	def __init__(self, window_fun: str ='triangle', cuda: bool = True) -> NoReturn:
 		self.window_fun_name = window_fun
 		self.get_window_fun()

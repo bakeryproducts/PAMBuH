@@ -30,11 +30,13 @@ def get_last_model(src):
 def rescale(batch_img, scale): return F.interpolate(batch_img, scale_factor=(scale, scale))
 
 def preprocess_image(img, transform):
+    # TODO scaling param
+    DOWNSCALE = 2
     ch, H,W, dtype = *img.shape, img.dtype
     assert ch==3 and dtype==np.uint8
     img = img.transpose(1,2,0)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (W//2, H//2))
+
+    img = cv2.resize(img, (W // DOWNSCALE, H // DOWNSCALE))
     return transform(image=img)['image']
 
 def _infer_func(imgs, transform, model):
@@ -43,10 +45,17 @@ def _infer_func(imgs, transform, model):
     #print(batch.shape, batch.dtype)
     with torch.no_grad():
         res = torch.sigmoid(model(batch))
-    res = rescale(res, 2)
+
+    UPSCALE = 2
+    res = rescale(res, UPSCALE)
     return res
     
 def get_infer_func(root):
+    """
+        Wraps model and preprocessing in one function with argument [img, ...]
+        img is HWC (because of transforms)
+        Returns torch tensor on CUDA, [len(inp), 1, H, W]
+    """
     root = Path(root)
     sys.path.append(str(root / 'src'))
 
@@ -57,9 +66,6 @@ def get_infer_func(root):
     cfg_init(str(root / 'cfg.yaml'))
     cfg['PARALLEL']['DDP'] = False
     cfg['DATA']['TRAIN']['PRELOAD'] = False
-    # TODO replace this
-    cfg['TRANSFORMERS']['MEAN'] = (0.6616420882978906, 0.40941636273207577, 0.609469758520619)
-    cfg['TRANSFORMERS']['STD'] = (0.10016240762553758, 0.17558692487633998, 0.12962072919146864)
 
     train_trans = augs.get_aug('light', cfg.TRANSFORMERS)
     transform = train_trans.transforms.transforms[-1] # norm and chw

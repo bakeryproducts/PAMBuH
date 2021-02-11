@@ -7,16 +7,11 @@ import torch.nn.functional as F
 from pathlib import Path
 from typing import NoReturn, Union
 import matplotlib.pyplot as plt
-from utils import read_frame, save_tiff_uint8_single_band
+from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
 from rle2tiff import mask2rle
 
 def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
-	# WTF break it down for:
-	# 1. actual tiff image block reader, with block_size and step 
-	# 2. processing part with infer_func. Infer func should take List of images, CHW, uint8
-	#    as it returns from simple fd.read()
-
 	fd, shape, channel = get_basics_rasterio(path)
 	
 	rows = []
@@ -26,19 +21,16 @@ def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
 			pad = (size//4, size - shape[1]%size, size//4, 0)
 		elif shape[0]-ny < size:
 			pad = (size//4, size - shape[1]%size, 0, size + ny - shape[0])
-		row = read_frame(fd, 0, ny, shape[1], size)
+		#row = read_frame(fd, 0, ny, shape[1], size)
+		row = torch.ByteTensor(get_tiff_block(fd, 0, ny, shape[1], size))
 		row_img = F.pad(row, pad=pad, mode='constant', value=0)
 		
-		#row_img = row_img.unsqueeze(0)
-		#left_i = torch.split(row_img, size, dim=3)[:-1]
-		#right_i = torch.split(row_img[:, :, :, size//4:], size, dim=3)
 		left_i = torch.split(row_img, size, dim=2)[:-1]
 		right_i = torch.split(row_img[:, :, size//4:], size, dim=2)
 
 		imgs_batch = []
 		for i in range(len(left_i)):
 			imgs_batch.extend([left_i[i], right_i[i]])
-		#infer_batch = inf(torch.cat(imgs_batch, 0))
 		infer_batch = inf(imgs_batch)
 		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))

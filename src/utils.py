@@ -7,6 +7,7 @@ from functools import partial
 import multiprocessing as mp
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
+from rasterio.windows import Window
 
 import cv2
 import torch
@@ -88,46 +89,56 @@ def make_folders(cfg):
 
     return fname
 
-
 def save_models(d, postfix, output_folder):
     for k, v in d.items():
-        torch.save(v.state_dict(), output_folder / os.path.join("models", f"{k}_{postfix}.pkl"))
-
+        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl")) 
 
 def dump_params(cfg, output_path):
     with open(os.path.join(output_path, 'cfg.yaml'), 'w') as f:
         f.write(cfg.dump())
-
-
+        
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", default=0, type=int)
     args = parser.parse_args()
     return args
 
-
 def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
 
+def read_frame(fd, x, y, h, w=None, c=3):
+    if w is None: w = h
+    img = fd.read(list(range(1, c+1)), window=Window(x, y, h, w))
+    return torch.ByteTensor(img)
+
+def save_tiff_uint8_single_band(img, path):
+    if isinstance(img, torch.Tensor):
+        img = np.array(img)
+    elif not isinstance(img, numpy.ndarray):
+        raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
+    assert img.dtype == np.uint8
+    h, w = img.shape
+    dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
+    dst.write(img, 1) # 1 band
+    dst.close()
+    print(f'Save to {path}')
+    del dst
 
 def cfg_frz(func):
     def frz(*args, **kwargs):
         cfg.defrost()
         r = func(*args, **kwargs)
         cfg.freeze()
-        return r
-
+        return r 
     return frz
-
 
 @contextmanager
 def poolcontext(*args, **kwargs):
     pool = mp.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
-
-
+    
 def mp_func(foo, args, n):
     args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
     with poolcontext(processes=n) as pool:

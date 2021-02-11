@@ -1,65 +1,70 @@
 import json
 from PIL import Image
 from typing import List, Tuple
-
+import random 
 import numpy as np
-from shapely.geometry import Polygon
 import rasterio
 from rasterio.windows import Window
 
-from utils import jread, get_basics_rasterio
+from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist
 
 
 class GdalSampler:
     """Iterates over img with annotation, returns tuples of img, mask
     """
 
-    def __init__(self, img_path: str, mask_path: str, img_polygs_path: str, wh: Tuple[int], mask_wh: Tuple[int]):
-        self._markups = jread(img_polygs_path)
-        self._masks = rasterio.open(mask_path)
+    def __init__(self, img_path: str,
+                 mask_path: str,
+                 img_polygons_path: str,
+                 img_wh: Tuple[int, int],
+                 mask_wh: Tuple[int, int],
+                 rand_shift_range: Tuple[int, int] = (0, 0)) -> Tuple[np.ndarray, np.ndarray]:
+        """If rand_shift_range ~ (0,0), then centroid of glomerulus corresponds centroid of output sample
+        """
+        assert img_wh == mask_wh, "Image and mask wh should be identical"
+        self._records_json = jread(img_polygons_path)
+        self._mask = rasterio.open(mask_path)
         self._img = rasterio.open(img_path)
-
-        self._wh = wh
+        self._img_wh = img_wh
         self._mask_wh = mask_wh
         self._bands_img = (1, 2, 3)
         self._bands_mask = 1
         self._count = -1
-        # Get polygons
-        self.polygs = [polyg['geometry']['coordinates'][0] for polyg in self._markups]
-        self.polygs_norm = [(np.array(polyg) - np.array(Polygon(polyg).centroid) + np.array([mask_wh[0] // 2,
-                                                                                             mask_wh[0] // 2])).
-                                tolist() for polyg in self.polygs]
-        polygs_cent_coord = [np.round(Polygon(polyg).centroid) for polyg in self.polygs]
-        # Get offsets
-        self.xoff_img = [int(polyg_cent_coord[0] - self._wh[0] // 2) for polyg_cent_coord in polygs_cent_coord]
-        self.yoff_img = [int(polyg_cent_coord[1] - self._wh[1] // 2) for polyg_cent_coord in polygs_cent_coord]
-        self.xoff_mask = [int(polyg_cent_coord[0] - self._mask_wh[0] // 2) for polyg_cent_coord in polygs_cent_coord]
-        self.yoff_mask = [int(polyg_cent_coord[1] - self._mask_wh[1] // 2) for polyg_cent_coord in polygs_cent_coord]
+        self._rand_shift_range = rand_shift_range
+        # Get 1d list of polygons
+        polygons = flatten_2dlist([json_record_to_poly(record) for record in self._records_json])
+        self._polygons_centroid = [np.round(polygon.centroid) for polygon in polygons]
 
     def __iter__(self):
         return self
 
     def __len__(self):
-        return len(self._markups)
+        return len(self._records_json)
 
     def __next__(self):
         self._count += 1
-        if self._count < len(self._markups):
+        if self._count < len(self._records_json):
             return self.__getitem__(self._count)
         else:
             self._count = -1
             raise StopIteration("Failed to proceed to the next step")
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        window_img = Window(self.xoff_img[idx], self.yoff_img[idx], *self._wh)
-        window_mask = Window(self.xoff_mask[idx], self.yoff_mask[idx], *self._mask_wh)
+        x_rand_shift, y_rand_shift = random.randint(-self._rand_shift_range[0], self._rand_shift_range[0]), \
+                                     random.randint(-self._rand_shift_range[1], self._rand_shift_range[1])
+        x_shift, y_shift = -self._img_wh[0]//2 + x_rand_shift, -self._img_wh[1]//2 + x_rand_shift
+
+        window_img = Window(self._polygons_centroid[idx][0]+x_shift,
+                            self._polygons_centroid[idx][1]+y_shift, * self._img_wh)
+        window_mask = Window(self._polygons_centroid[idx][0]+x_shift,
+                             self._polygons_centroid[idx][1]+y_shift, * self._mask_wh)
         img = self._img.read(self._bands_img, window=window_img)
-        mask = self._masks.read(self._bands_mask, window=window_mask)
-        return img, mask.astype(bool)
+        mask = self._mask.read(self._bands_mask, window=window_mask)
+        return img, mask
 
     def __del__(self):
-        del self._markups
-        del self._masks
+        del self._records_json
+        del self._mask
         del self._img
 
 

@@ -13,6 +13,7 @@ import torch
 import rasterio
 import numpy as np
 from shapely import geometry
+import itertools
 
 from config import cfg
 
@@ -55,22 +56,22 @@ def polyg_to_mask(polyg: np.ndarray, wh: Tuple[int, int], fill_value: int) -> np
 
 
 def json_record_to_poly(record: Dict) -> List[geometry.Polygon]:
-    """Get list of polygs from record.
+    """Get list of polygons from record.
     """
 
-    num_polygs = len(record['geometry']['coordinates'])
-    if num_polygs == 1:     # Polygon
+    num_polygons = len(record['geometry']['coordinates'])
+    if num_polygons == 1:     # Polygon
         list_coords = [record['geometry']['coordinates'][0]]
-    elif num_polygs > 1:    # MultiPolygon
-        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygs)]
+    elif num_polygons > 1:    # MultiPolygon
+        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygons)]
     else:
         raise Exception("No polygons are found")
 
     try:
-        polygs = [geometry.Polygon(coords) for coords in list_coords]
+        polygons = [geometry.Polygon(coords) for coords in list_coords]
     except Exception as e:
         print(e, list_coords)
-    return polygs
+    return polygons
 
 
 def make_folders(cfg):
@@ -164,12 +165,20 @@ def mp_func_gen(foo, args, n, progress=None):
     return results
 
 
-def get_cortex_polygs(anot_structs_json: Dict) -> List[geometry.Polygon]:
+def get_cortex_polygons(anot_structs_json: Dict) -> List[geometry.Polygon]:
     """ Get list of cortex polygons from anot_structs_json.
     """
 
-    cortex_polygs = []
+    cortex_polygons = []
     for record in anot_structs_json:
         if record['properties']['classification']['name'] == 'Cortex':
-            cortex_polygs += json_record_to_poly(record)
-    return cortex_polygs
+            cortex_polygons += json_record_to_poly(record)
+    return cortex_polygons
+
+
+def flatten_2dlist(list2d: List) -> List:
+    """Convert 2d list into 1d list.
+    """
+
+    list1d = list(itertools.chain(*list2d))
+    return list1d

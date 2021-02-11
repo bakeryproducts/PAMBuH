@@ -30,7 +30,7 @@ def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
 
 		imgs_batch = []
 		for i in range(len(left_i)):
-			imgs_batch.extend([left_i[i], right_i[i]])
+			imgs_batch.extend([left_i[i].numpy(), right_i[i].numpy()])
 		infer_batch = inf(imgs_batch)
 		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
 		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))

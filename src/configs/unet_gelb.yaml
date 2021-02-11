@@ -7,7 +7,7 @@ DATA:
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
-    MULTIPLY: {'rate':5}
+    MULTIPLY: {'rate':10}
   VALID:
     DATASETS: ['val1024x05']
     PRELOAD: False
@@ -29,15 +29,15 @@ TRAIN:
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
-  SAVE_STEP: 0.3
+  SAVE_STEP: .3
   SCALAR_STEP: 1
-  TB_STEP: 100
+  TB_STEP: 2
   
-  EPOCH_COUNT: 2000
+  EPOCH_COUNT: 10
   BATCH_SIZE: 64
 VALID:
-  STEP: 5
-  BATCH_SIZE: 64
+  STEP: 10
+  BATCH_SIZE: 32
 TEST:
   BATCH_SIZE: 1
   

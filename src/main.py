@@ -10,6 +10,7 @@ from train import start
 import utils 
 from config import cfg, cfg_init
 
+
 def set_gpus(cfg):
     if os.environ.get('CUDA_VISIBLE_DEVICES') is None:
         gpus = ','.join([str(g) for g in cfg.TRAIN.GPUS])
@@ -57,6 +58,11 @@ def parse_args():
     return args
 
 if __name__  == "__main__":
+    """
+        I know this is main, but actual start happens to be in src/starter(.sh)
+        This is because of torch DDP https://pytorch.org/docs/stable/notes/ddp.html ,
+        which is multiprocess (several GPUs), and even multinode (several servers) setup
+    """
     args = parse_args()
     cfg_init(args.cfg)
     set_gpus(cfg)

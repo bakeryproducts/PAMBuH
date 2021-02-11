@@ -61,6 +61,11 @@ class SegmentDataset:
     
 
 def init_datasets(cfg):
+    """
+        DATASETS dictionary:
+            keys are custom names to use in unet.yaml
+            values are actual Datasets on desired folders
+    """
     DATA_DIR = Path(cfg.INPUTS).absolute()
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     
@@ -87,6 +92,24 @@ def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST'])
     return converted_datasets
 
 def build_datasets(cfg, mode_train=True, num_proc=4):
+    """
+        Creates dictionary :
+        {
+            'TRAIN': <122254afsf9a>.obj.dataset,
+            'VALID': <ascas924ja>.obj.dataset,
+            'TEST': <das92hjasd>.obj.dataset,
+        }
+
+        train_dataset = build_datasets(cfg)['TRAIN']
+        preprocessed_image, preprocessed_mask = train_dataset[0]
+
+        All additional operations like preloading into memory, augmentations, etc
+        is just another Dataset over existing one.
+            preload_dataset = PreloadingDataset(MyDataset)
+            augmented_dataset = TransformDataset(preload_dataset)
+    """
+
+
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
     transform_factory = {
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
@@ -123,6 +146,15 @@ def create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_l
     return dl
 
 def build_dataloaders(cfg, datasets, samplers=None, drop_last=False, pin=False):
+    '''
+        Builds dataloader from datasets dictionary {'TRAIN':ds1, 'VALID':ds2}
+        dataloaders :
+            {
+                'TRAIN': <sadd21e>.obj.dataloader,
+                    ...
+            }
+        TODO: refactor parameters loading loop
+    '''
     dls = {}
     batch_sizes = {'TRAIN': cfg.TRAIN.BATCH_SIZE,
                     'VALID': cfg.VALID.BATCH_SIZE}

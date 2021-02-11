@@ -3,6 +3,31 @@ from pathlib import Path
 
 from yacs.config import CfgNode as CN
 
+'''
+yacs configurator : https://github.com/rbgirshick/yacs
+
+This file is kinda template which joins with actual .yaml config (src/configs/unet.yaml)
+In this file all values are intentionally WRONG, because one should init cfg by hand in code:
+
+    from config import cfg, cfg_init
+    cfg_init('unet.yaml')
+
+, which will create a singleton object cfg to use throughout all process functions
+
+
+All params is of specific types, i.e. you cant use .yaml like that:
+    unet.yaml:
+        TRAIN.BATCH_SIZE = 32.
+    config.py:
+        TRAIN.BATCH_SIZE = 16
+
+
+Some of paramteres like WORLD_SIZE should not be inited by hand in .yaml file
+Consider them technical information
+
+'''
+
+
 _C = CN()
 _C.OUTPUTS = ''
 _C.INPUTS = ''

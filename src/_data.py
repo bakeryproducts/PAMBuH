@@ -9,6 +9,12 @@ from torch.utils.data.dataset import ConcatDataset as TorchConcatDataset
 import utils
 
 
+"""
+Templates for data.py that should not be changed
+
+"""
+
+
 class Dataset:
     def __init__(self, root, pattern):
         self.root = Path(root)

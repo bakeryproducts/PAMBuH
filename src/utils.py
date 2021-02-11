@@ -16,6 +16,7 @@ from shapely import geometry
 
 from config import cfg
 
+
 def jread(path: str) -> Dict:
     with open(str(path), 'r') as f:
         data = json.load(f)
@@ -53,19 +54,24 @@ def polyg_to_mask(polyg: np.ndarray, wh: Tuple[int, int], fill_value: int) -> np
     return mask
 
 
-def json_record_to_poly(record: List) -> List:
-    coords = record['geometry']['coordinates'][0] # 0 as in first part of multipart poly
-    try: poly = geometry.Polygon(coords)
-    except Exception as e: print(e, coords)
-    return poly
-
-
-def create_dir(path: str) -> None:
-    """ Create directory if ot existed.
+def json_record_to_poly(record: Dict) -> List[geometry.Polygon]:
+    """Get list of polygs from record.
     """
 
-    if not os.path.isdir(path):
-        os.makedirs(path)
+    num_polygs = len(record['geometry']['coordinates'])
+    if num_polygs == 1:     # Polygon
+        list_coords = [record['geometry']['coordinates'][0]]
+    elif num_polygs > 1:    # MultiPolygon
+        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygs)]
+    else:
+        raise Exception("No polygons are found")
+
+    try:
+        polygs = [geometry.Polygon(coords) for coords in list_coords]
+    except Exception as e:
+        print(e, list_coords)
+    return polygs
+
 
 def make_folders(cfg):
     cfg_postfix = 'PAMBUH'
@@ -79,7 +85,7 @@ def make_folders(cfg):
     os.makedirs(models_dir, exist_ok=True)
     tb_dir = fname / 'tb'
     os.makedirs(tb_dir, exist_ok=True)
-    
+
     return fname
 
 def save_models(d, postfix, output_folder):
@@ -156,3 +162,14 @@ def mp_func_gen(foo, args, n, progress=None):
         for r in gen:
             results.extend(r)
     return results
+
+
+def get_cortex_polygs(anot_structs_json: Dict) -> List[geometry.Polygon]:
+    """ Get list of cortex polygons from anot_structs_json.
+    """
+
+    cortex_polygs = []
+    for record in anot_structs_json:
+        if record['properties']['classification']['name'] == 'Cortex':
+            cortex_polygs += json_record_to_poly(record)
+    return cortex_polygs

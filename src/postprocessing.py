@@ -10,34 +10,35 @@ from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
 from rle2tiff import mask2rle
 
-def read_and_process_img(path : str, inf, size : int = 512, crop_size : int = 500) -> np.ndarray:
-	assert size >= crop_size, (size, crop_size)
-	fd, shape, channel = get_basics_rasterio(path)
-	print(shape)
-	border = (size - crop_size)//2
+def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size : int = 500) -> np.ndarray:
+	assert block_size >= crop_size, (block_size, crop_size)
+	fd, (h, w), channel = get_basics_rasterio(path)
+	print(h, w)
+	pad = (block_size - crop_size)//2
 	rows = []
-	for y in tqdm(range(-border, shape[0], crop_size), desc='rows'):
+	for y in tqdm(range(-pad, h, crop_size), desc='rows'):
 		row, zeros_idx = [], []
-		for i, x in enumerate(tqdm(range(-border, shape[1], crop_size), desc='columns')):
-			pad_x = (border if x < 0 else 0, x + size - shape[1] if x + size > shape[1] else 0)
-			pad_y = (border if y < 0 else 0, y + size - shape[0] if y + size > shape[0] else 0)
-			pad = ((0, 0), pad_y, pad_x)
-			img = get_tiff_block(fd, x, y, size)
-			pad_img = np.pad(img, pad, 'constant', constant_values=0)
-			if pad_img.max() > 0:
-				row.append(pad_img)
+		for i, x in enumerate(tqdm(range(-pad, w, crop_size), desc='columns')):
+			pad_x = (pad if x < 0 else 0, x + block_size - w if x + block_size > w else 0)
+			pad_y = (pad if y < 0 else 0, y + block_size - h if y + block_size > h else 0)
+			pad_chw = ((0, 0), pad_y, pad_x)
+			block = get_tiff_block(fd, x, y, block_size)
+			pad_block = np.pad(block, pad_chw, 'constant', constant_values=0)
+			if pad_block.max() > 0:
+				row.append(pad_block)
 			else:
 				zeros_idx.append(i)
 		if row:
-			masks = [i.unsqueeze(0)[:, :, border:-border, border:-border] for i in inf(row)]
+			nozero_masks = do_infer(row)[:, :, pad:-pad, pad:-pad]
+			masks_list = [i.squeeze(0) for i in nozero_masks]
 			for i in zeros_idx:
-				masks.insert(i, torch.zeros((1, 1, size, size)))
-			masks = torch.cat(masks, 0)
+				masks_list.insert(i, torch.zeros((crop_size, crop_size)))
+			mask_row = torch.cat(masks, 0)
 		else:
-			masks = torch.zeros((len(zeros_idx), channel, crop_size, crop_size))
-		rows.append(torch.cat([i for i in masks], 2).squeeze(0))
-	mask = np.uint8(torch.cat(rows, 0)[:shape[0], :shape[1]]*255)
-	assert mask.shape == shape
+			mask_row = torch.zeros((crop_size, w))
+		rows.append(mask_row)
+	mask = np.uint8(torch.cat(rows, 0)[:h, :w]*255)
+	assert mask.shape == (h, w)
 	return mask
 
 def _plot_img(img: np.ndarray) -> NoReturn:

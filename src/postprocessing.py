@@ -33,7 +33,7 @@ def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size
 			masks_list = [i.squeeze(0) for i in nozero_masks]
 			for i in zeros_idx:
 				masks_list.insert(i, torch.zeros((crop_size, crop_size)))
-			mask_row = torch.cat(masks, 0)
+			mask_row = torch.cat(masks, 1)
 		else:
 			mask_row = torch.zeros((crop_size, w))
 		rows.append(mask_row)

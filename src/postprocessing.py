@@ -10,7 +10,13 @@ from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
 from rle2tiff import mask2rle
 
-def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size : int = 500, batch_size : int = 4) -> np.ndarray:
+
+def chunks(lst, n):
+	"""Yield successive n-sized chunks from lst."""
+	for i in range(0, len(lst), n):
+		yield lst[i:i + n]
+
+def read_and_process_img(path : str, do_infer, block_size : int = 2048, crop_size : int = 2000, batch_size : int = 4) -> np.ndarray:
 	assert block_size >= crop_size, (block_size, crop_size)
 	fd, (h, w), channel = get_basics_rasterio(path)
 	print(h, w)
@@ -30,13 +36,13 @@ def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size
 				zeros_idx.append(i)
 		if row:
 			nozero_masks = []
-            for chunk in chunks(row, batch_size):
-                nozero_masks.append(do_infer(chunk)[:, :, pad:-pad, pad:-pad])
-            nozero_masks = torch.cat(nozero_masks, 0)
+			for chunk in chunks(row, batch_size):
+				nozero_masks.append(do_infer(chunk)[:, :, pad:-pad, pad:-pad])
+			nozero_masks = torch.cat(nozero_masks, 0)
 			masks_list = [i.squeeze(0) for i in nozero_masks]
 			for i in zeros_idx:
 				masks_list.insert(i, torch.zeros((crop_size, crop_size)))
-			mask_row = torch.cat(masks, 1)
+			mask_row = torch.cat(masks_list, 1)
 		else:
 			mask_row = torch.zeros((crop_size, w))
 		rows.append(mask_row)

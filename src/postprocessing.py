@@ -10,30 +10,35 @@ from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
 from rle2tiff import mask2rle
 
-def read_and_process_img(path : str, inf, size : int =512) -> torch.Tensor:
+def read_and_process_img(path : str, inf, size : int = 512, crop_size : int = 500) -> np.ndarray:
+	assert size >= crop_size, (size, crop_size)
 	fd, shape, channel = get_basics_rasterio(path)
-	
+	print(shape)
+	border = (size - crop_size)//2
 	rows = []
-	for ny in tqdm(range(-size//4, shape[0], size//2), desc='rows'):
-		pad=(size//4, size - shape[1]%size)
-		if ny < 0:
-			pad = (size//4, size - shape[1]%size, size//4, 0)
-		elif shape[0]-ny < size:
-			pad = (size//4, size - shape[1]%size, 0, size + ny - shape[0])
-		#row = read_frame(fd, 0, ny, shape[1], size)
-		row = torch.ByteTensor(get_tiff_block(fd, 0, ny, shape[1], size))
-		row_img = F.pad(row, pad=pad, mode='constant', value=0)
-		
-		left_i = torch.split(row_img, size, dim=2)[:-1]
-		right_i = torch.split(row_img[:, :, size//4:], size, dim=2)
-
-		imgs_batch = []
-		for i in range(len(left_i)):
-			imgs_batch.extend([left_i[i].numpy(), right_i[i].numpy()])
-		infer_batch = inf(imgs_batch)
-		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
-		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
-	return np.uint8(torch.cat(rows, 0)[:shape[0], :shape[1]]*255)
+	for y in tqdm(range(-border, shape[0], crop_size), desc='rows'):
+		row, zeros_idx = [], []
+		for i, x in enumerate(tqdm(range(-border, shape[1], crop_size), desc='columns')):
+			pad_x = (border if x < 0 else 0, x + size - shape[1] if x + size > shape[1] else 0)
+			pad_y = (border if y < 0 else 0, y + size - shape[0] if y + size > shape[0] else 0)
+			pad = ((0, 0), pad_y, pad_x)
+			img = get_tiff_block(fd, x, y, size)
+			pad_img = np.pad(img, pad, 'constant', constant_values=0)
+			if pad_img.max() > 0:
+				row.append(pad_img)
+			else:
+				zeros_idx.append(i)
+		if row:
+			masks = [i.unsqueeze(0)[:, :, border:-border, border:-border] for i in inf(row)]
+			for i in zeros_idx:
+				masks.insert(i, torch.zeros((1, 1, size, size)))
+			masks = torch.cat(masks, 0)
+		else:
+			masks = torch.zeros((len(zeros_idx), channel, crop_size, crop_size))
+		rows.append(torch.cat([i for i in masks], 2).squeeze(0))
+	mask = np.uint8(torch.cat(rows, 0)[:shape[0], :shape[1]]*255)
+	assert mask.shape == shape
+	return mask
 
 def _plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)

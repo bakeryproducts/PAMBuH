@@ -10,7 +10,7 @@ from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
 from rle2tiff import mask2rle
 
-def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size : int = 500) -> np.ndarray:
+def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size : int = 500, batch_size : int = 4) -> np.ndarray:
 	assert block_size >= crop_size, (block_size, crop_size)
 	fd, (h, w), channel = get_basics_rasterio(path)
 	print(h, w)
@@ -29,7 +29,10 @@ def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size
 			else:
 				zeros_idx.append(i)
 		if row:
-			nozero_masks = do_infer(row)[:, :, pad:-pad, pad:-pad]
+			nozero_masks = []
+            for chunk in chunks(row, batch_size):
+                nozero_masks.append(do_infer(chunk)[:, :, pad:-pad, pad:-pad])
+            nozero_masks = torch.cat(nozero_masks, 0)
 			masks_list = [i.squeeze(0) for i in nozero_masks]
 			for i in zeros_idx:
 				masks_list.insert(i, torch.zeros((crop_size, crop_size)))
@@ -37,7 +40,7 @@ def read_and_process_img(path : str, do_infer, block_size : int = 512, crop_size
 		else:
 			mask_row = torch.zeros((crop_size, w))
 		rows.append(mask_row)
-	mask = np.uint8(torch.cat(rows, 0)[:h, :w]*255)
+	mask = np.uint8((torch.cat(rows, 0)[:h, :w]*255).to('cpu'))
 	assert mask.shape == (h, w)
 	return mask
 

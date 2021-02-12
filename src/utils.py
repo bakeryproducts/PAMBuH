@@ -7,7 +7,7 @@ from functools import partial
 import multiprocessing as mp
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
-
+from rasterio.windows import Window
 import cv2
 import torch
 import rasterio
@@ -107,28 +107,19 @@ def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
 
-def read_frame(fd, x, y, h, w=None, c=3):
-    # CHTO ETO ZA HUYNA? TARANTINO TI OPYAT' VYHODISH NA SVYAZ'???
-    # ds = rasterio.open(path) ### ds stands for dataset, common name for gdal-like readers
-    # w,h=1024,1024
-    # bands = [1,2,3] ### bands stands for channels, common name for gdal-like readers
-    # block = ds.read([1,2,3], window=((x,x+w),(y,y+h))) ### as block read
-    # BLOCK is common name for gdal-like readers:  https://gis.stackexchange.com/questions/158527/reading-raster-files-by-block-with-rasterio/158528
-    # FRAME IS WTF IS FRAME???
-    if w is None: w = h # WTF IS THIS
-    img = fd.read(list(range(1, c+1)), window=Window(x, y, h, w))
-    return torch.ByteTensor(img)# TORCH BYTE TENSOR??? read_frame should be get_tiff_block_by_coordinates_and_convert_to_byte_tensor???
+def get_tiff_block(ds, x, y, h, w=None, bands=3):
+    if w is None: w = h
+    return ds.read(list(range(1, bands+1)), window=Window(x, y, h, w))
 
 def save_tiff_uint8_single_band(img, path):
-    # NAHUYA SOHRANYALKE TIFF FILOV vpizdu koroch 
     if isinstance(img, torch.Tensor):
         img = np.array(img)
-    elif not isinstance(img, numpy.ndarray):
+    elif not isinstance(img, np.ndarray):
         raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
     assert img.dtype == np.uint8
     h, w = img.shape
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
-    dst.write(img, 1) # 1 band
+    dst.write(img, 1)
     dst.close()
     print(f'Save to {path}') 
     del dst

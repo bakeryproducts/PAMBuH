@@ -1,5 +1,3 @@
-# TWO TABS INDENT? WTF
-
 #from tqdm import tqdm
 from tqdm.notebook import tqdm
 import numpy as np
@@ -8,43 +6,51 @@ import torch.nn.functional as F
 from pathlib import Path
 from typing import NoReturn, Union
 import matplotlib.pyplot as plt
-from utils import create_dir, read_frame, save_tiff_uint8_single_band
+from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
 from sampler import get_basics_rasterio
+from rle2tiff import mask2rle
 
-def block_reader(path : str, inf, size : int =512, infer_list_flg : bool =False) -> torch.Tensor:
-    # WTF break it down for:
-    # 1. actual tiff image block reader, with block_size and step 
-    # 2. processing part with infer_func. Infer func should take List of images, CHW, uint8
-    #    as it returns from simple fd.read()
-        
-	fd, shape, channel = get_basics_rasterio(path)
-	
+
+def chunks(lst, n):
+	"""Yield successive n-sized chunks from lst."""
+	for i in range(0, len(lst), n):
+		yield lst[i:i + n]
+
+def read_and_process_img(path : str, do_infer, block_size : int = 2048, crop_size : int = 2000, batch_size : int = 4) -> np.ndarray:
+	assert block_size >= crop_size, (block_size, crop_size)
+	fd, (h, w), channel = get_basics_rasterio(path)
+	print(h, w)
+	pad = (block_size - crop_size)//2
 	rows = []
-	for ny in tqdm(range(-size//4, shape[0], size//2), desc='rows'):
-		pad=(size//4, size - shape[1]%size)
-		if ny < 0:
-			pad = (size//4, size - shape[1]%size, size//4, 0)
-		elif shape[0]-ny < size:
-			pad = (size//4, size - shape[1]%size, 0, size + ny - shape[0])
-		row = read_frame(fd, 0, ny, shape[1], size)
-		row_img = F.pad(row, pad=pad, mode='constant', value=0)
-		row_img = row_img.unsqueeze(0)
-		left_i = torch.split(row_img, size, dim=3)[:-1]
-		right_i = torch.split(row_img[:, :, :, size//4:], size, dim=3)
-
-		imgs_batch = []
-		for i in range(len(left_i)):
-			imgs_batch.extend([left_i[i], right_i[i]])
-		if infer_list_flg:
-			infer_batch = inf(imgs_batch)
+	for y in tqdm(range(-pad, h, crop_size), desc='rows'):
+		row, zeros_idx = [], []
+		for i, x in enumerate(tqdm(range(-pad, w, crop_size), desc='columns')):
+			pad_x = (pad if x < 0 else 0, x + block_size - w if x + block_size > w else 0)
+			pad_y = (pad if y < 0 else 0, y + block_size - h if y + block_size > h else 0)
+			pad_chw = ((0, 0), pad_y, pad_x)
+			block = get_tiff_block(fd, x, y, block_size)
+			pad_block = np.pad(block, pad_chw, 'constant', constant_values=0)
+			if pad_block.max() > 0:
+				row.append(pad_block)
+			else:
+				zeros_idx.append(i)
+		if row:
+			nozero_masks = []
+			for chunk in chunks(row, batch_size):
+				nozero_masks.append(do_infer(chunk)[:, :, pad:-pad, pad:-pad])
+			nozero_masks = torch.cat(nozero_masks, 0)
+			masks_list = [i.squeeze(0) for i in nozero_masks]
+			for i in zeros_idx:
+				masks_list.insert(i, torch.zeros((crop_size, crop_size)))
+			mask_row = torch.cat(masks_list, 1)
 		else:
-			infer_batch = inf(torch.cat(imgs_batch, 0))
-		infer_batch = infer_batch[:, :, size//4:-size//4, size//4:-size//4]
-		rows.append(torch.cat([i for i in infer_batch], 2).squeeze(0))
-	return torch.cat(rows, 0)[:shape[0], :shape[1]]
+			mask_row = torch.zeros((crop_size, w))
+		rows.append(mask_row)
+	mask = np.uint8((torch.cat(rows, 0)[:h, :w]*255).to('cpu'))
+	assert mask.shape == (h, w)
+	return mask
 
-def plot_img(img: np.ndarray) -> NoReturn:
-    # if this is not crucial, make it like _plot_img
+def _plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)
 	if len(img.shape) == 2:
 		plt.imshow(np.array(img))
@@ -52,31 +58,21 @@ def plot_img(img: np.ndarray) -> NoReturn:
 		plt.imshow(np.array(img).transpose(1, 2, 0))
 	plt.show()
 
-def postprocess(infer_func, src_folder : str, dst_folder : str, return_img : bool =False) -> Union[torch.Tensor, None]:
-    # wtf , postprocess_test_folder
-
+def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> NoReturn:
 	"""
-	infer_func([BxCxHxV]) -> [BxCxHxV] # this is wrong, wtf is V? , list(img1, img2, ...) -> torch.tensor
+	infer_func(list(img1, img2, ...) -> [BxCxHxW]
 	src_folder - folder with test images
 	dst_folder - folder to save output (RLE and predictions)
-
-        wtf with return_img? postprocess should be able of optionally save binary masks to tiff files 
-
 	"""
 	imgs_name = Path(src_folder).glob('*.tiff')
-	create_dir(dst_folder)# wtf os.makedirs (exists_ok)
-	for img_name in tqdm(imgs_name, desc='Images', leave=False): # Images? at least Test images
-		img = block_reader(img_name, infer_func) # wtf? mask = read_and_process_img(name, process_func)
-		if return_img:
-			return img # wtf??
-		else:
-			save_tiff_uint8_single_band(img, Path(dst_folder) / img_name.name)
+	dst_folder = Path(dst_folder)
+	dst_folder.mkdir(parents=True, exist_ok=True)
+	for img_name in tqdm(imgs_name, desc='Test images', leave=False):
+		mask = read_and_process_img(img_name, infer_func)
+		save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
+		jdump(mask2rle(mask), dst_folder / img_name.stem + '.json')
 			
 class SmoothTiles:
-    '''
-        _SmoothTiles ?
-
-    '''
 	def __init__(self, window_fun: str ='triangle', cuda: bool = True) -> NoReturn:
 		self.window_fun_name = window_fun
 		self.get_window_fun()

@@ -1,14 +1,15 @@
-#from tqdm import tqdm
-from tqdm.notebook import tqdm
-import numpy as np
-import torch
-import torch.nn.functional as F
 from pathlib import Path
 from typing import NoReturn, Union
+
+import torch
+import numpy as np
+from tqdm.auto import tqdm
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
-from utils import get_tiff_block, save_tiff_uint8_single_band, jdump
-from sampler import get_basics_rasterio
-from rle2tiff import mask2rle
+
+import utils
+import sampler
+import rle2tiff
 
 
 def chunks(lst, n):
@@ -18,8 +19,20 @@ def chunks(lst, n):
 
 
 def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size: int = 2000, batch_size: int = 4) -> np.ndarray:
-    assert block_size >= crop_size, (block_size, crop_size)
-    fd, (h, w), channel = get_basics_rasterio(path)
+	""" Giga Function doing everything. made by galayda 
+
+	Args:
+		path (str): [description]
+		do_infer ([type]): [description]
+		block_size (int, optional): [description]. Defaults to 2048.
+		crop_size (int, optional): [description]. Defaults to 2000.
+		batch_size (int, optional): [description]. Defaults to 4.
+
+	Returns:
+		np.ndarray: [description]
+	"""    
+	assert block_size >= crop_size, (block_size, crop_size)
+    fd, (h, w), channel = sampler.get_basics_rasterio(path)
     print(h, w)
     pad = (block_size - crop_size)//2
     rows = []
@@ -29,7 +42,7 @@ def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size:
             pad_x = (pad if x < 0 else 0, x + block_size - w if x + block_size > w else 0)
             pad_y = (pad if y < 0 else 0, y + block_size - h if y + block_size > h else 0)
             pad_chw = ((0, 0), pad_y, pad_x)
-            block = get_tiff_block(fd, x, y, block_size)
+            block = utils.get_tiff_block(fd, x, y, block_size)
             pad_block = np.pad(block, pad_chw, 'constant', constant_values=0)
             if pad_block.max() > 0:
                 row.append(pad_block)
@@ -47,7 +60,9 @@ def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size:
         else:
             mask_row = torch.zeros((crop_size, w))
         rows.append(mask_row)
+    # so, all masks are in memory now? in float32? on gpu?
     mask = np.uint8((torch.cat(rows, 0)[:h, :w]*255).to('cpu'))
+    # and now there is a copy of that ?
     assert mask.shape == (h, w)
     return mask
 
@@ -62,21 +77,30 @@ def _plot_img(img: np.ndarray) -> NoReturn:
 
 
 def postprocess_test_folder(infer_func, src_folder: str, dst_folder: str) -> NoReturn:
-    """
-    infer_func(list(img1, img2, ...) -> [BxCxHxW]
-    src_folder - folder with test images
-    dst_folder - folder to save output (RLE and predictions)
-    """
-    imgs_name = Path(src_folder).glob('*.tiff')
+	"""[summary]
+	# WTF where is option to save predict rasters?
+                    TODO: this
+	Args:
+        infer_func ([type]): [description] 
+		src_folder (str): folder with test images
+		dst_folder (str): folder to save output (RLE and predictions)
+
+	Returns:
+		NoReturn: [description]
+	"""    
+	
+    imgs_name = Path(src_folder).glob('*.tiff') # should be utils.get_filenames
     dst_folder = Path(dst_folder)
     dst_folder.mkdir(parents=True, exist_ok=True)
     for img_name in tqdm(imgs_name, desc='Test images', leave=False):
         mask = read_and_process_img(img_name, infer_func)
-        save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
-        jdump(mask2rle(mask), dst_folder / img_name.stem + '.json')
+        utils.save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
+        utils.jdump(rle2tiff.mask2rle(mask), dst_folder / img_name.stem + '.json')
 
 
 class SmoothTiles:
+	"""WTF are we using this? 
+	"""	
     def __init__(self, window_fun: str = 'triangle', cuda: bool = True) -> NoReturn:
         self.window_fun_name = window_fun
         self.get_window_fun()

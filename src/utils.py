@@ -119,7 +119,6 @@ def save_tiff_uint8_single_band(img, path):
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
     dst.write(img, 1)
     dst.close()
-    print(f'Save to {path}')
     del dst
 
 def cfg_frz(func):

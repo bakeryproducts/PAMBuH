@@ -89,7 +89,7 @@ class BackgroundSampler:
         """
 
         assert img_wh == mask_wh, "Image and mask wh should be identical"
-        self._anot_struct_json = jread(img_anot_struct_path)
+        self._cortex_polygons = get_cortex_polygons(jread(img_anot_struct_path))
         self._mask = rasterio.open(mask_path)
         self._img = rasterio.open(img_path)
         self._img_wh = img_wh
@@ -113,20 +113,19 @@ class BackgroundSampler:
         num of glomeruli inside background by <self._step>.
         """
 
-        n_glom_in_backgr, trial = 0, 0
+        glom_presence_in_backgr, trial = 0, 0
 
         while True:
-            cortex_polygons = get_cortex_polygons(self._anot_struct_json)
-            cortex_num = random.randint(0, len(cortex_polygons) - 1)
-            rand_pt = gen_pt_in_poly(cortex_polygons[cortex_num])
+            cortex_polygon = random.choice(self._cortex_polygons)
+            rand_pt = gen_pt_in_poly(cortex_polygon)
             x_cent, y_cent = np.array(rand_pt).astype(int)
             x_off, y_off = x_cent - self._mask_wh[0] // 2, y_cent - self._mask_wh[1] // 2
             sample_mask = self._mask[y_off: y_off+self._mask_wh[1], x_off: x_off+self._mask_wh[0]]
 
-            if np.sum(sample_mask) <= n_glom_in_backgr * self._mask_glom_val:
+            if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
                 return x_cent, y_cent
             elif trial == self._max_trials:
-                trial, n_glom_in_backgr = 0, n_glom_in_backgr + self._step
+                trial, glom_presence_in_backgr = 0, glom_presence_in_backgr + self._step
 
     def __iter__(self):
         return self

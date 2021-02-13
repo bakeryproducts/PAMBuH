@@ -42,4 +42,4 @@ TEST:
   BATCH_SIZE: 1
   
 PARALLEL:
-  DDP: True
+  DDP: False

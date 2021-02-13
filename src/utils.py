@@ -92,12 +92,12 @@ def make_folders(cfg):
 
 def save_models(d, postfix, output_folder):
     for k, v in d.items():
-        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl")) 
+        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl"))
 
 def dump_params(cfg, output_path):
     with open(os.path.join(output_path, 'cfg.yaml'), 'w') as f:
         f.write(cfg.dump())
-        
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", default=0, type=int)
@@ -122,7 +122,7 @@ def save_tiff_uint8_single_band(img, path):
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
     dst.write(img, 1)
     dst.close()
-    print(f'Save to {path}') 
+    print(f'Save to {path}')
     del dst
 
 def cfg_frz(func):
@@ -130,7 +130,7 @@ def cfg_frz(func):
         cfg.defrost()
         r = func(*args, **kwargs)
         cfg.freeze()
-        return r 
+        return r
     return frz
 
 @contextmanager
@@ -138,7 +138,7 @@ def poolcontext(*args, **kwargs):
     pool = mp.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
-    
+
 def mp_func(foo, args, n):
     args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
     with poolcontext(processes=n) as pool:
@@ -158,7 +158,7 @@ def mp_func_gen(foo, args, n, progress=None):
 
 
 def get_cortex_polygons(anot_structs_json: Dict) -> List[geometry.Polygon]:
-    """ Get list of cortex polygons from anot_structs_json.
+    """ Gets list of cortex polygons from anot_structs_json.
     """
 
     cortex_polygons = []
@@ -169,7 +169,7 @@ def get_cortex_polygons(anot_structs_json: Dict) -> List[geometry.Polygon]:
 
 
 def flatten_2dlist(list2d: List) -> List:
-    """Convert 2d list into 1d list.
+    """Converts 2d list into 1d list.
     """
 
     list1d = list(itertools.chain(*list2d))
@@ -190,8 +190,8 @@ def tiff_merge_mask(path_tiff, path_mask, path_dst):
 
 def gen_pt_in_poly(polygon: geometry.Polygon,
                    max_num_attempts=50) -> geometry.Point:
-    """Generate randomly point within given polygon. If after max_num_attempts point has been not
-    found, then return centroid of polygon.
+    """Generates randomly point within given polygon. If after max_num_attempts point has been not
+    found, then returns centroid of polygon.
     """
 
     min_x, min_y, max_x, max_y = polygon.bounds

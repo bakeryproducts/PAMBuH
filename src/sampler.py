@@ -105,8 +105,8 @@ class BackgroundSampler:
         self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
 
     def gen_backgr_pt(self) -> Tuple[int, int]:
-        """Generate background point.
-        Idea is to take only <self._max_trials> trials, if point is not found, then increment permissible
+        """Generates background point.
+        Idea is to take only <self._max_trials> trials, if point has not been found, then increment permissible
         num of glomeruli inside background by <self._step>.
         """
 

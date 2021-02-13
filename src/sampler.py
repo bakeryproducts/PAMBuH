@@ -6,7 +6,7 @@ import numpy as np
 import rasterio
 from rasterio.windows import Window
 
-from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist
+from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist, get_cortex_polygons, gen_pt_in_poly
 
 
 class GdalSampler:
@@ -64,6 +64,97 @@ class GdalSampler:
 
     def __del__(self):
         del self._records_json
+        del self._mask
+        del self._img
+
+
+class BackgroundSampler:
+    """Generates tuples of img and mask without glomeruli.
+    """
+
+    def __init__(self,
+                 img_path: str,
+                 mask_path: str,
+                 img_anot_struct_path: str,
+                 img_wh: Tuple[int, int],
+                 mask_wh: Tuple[int, int],
+                 num_samples: int,
+                 step: int = 25,
+                 max_trials: int = 25,
+                 mask_glom_val: int = 255) -> Tuple[np.ndarray, np.ndarray]:
+        """
+           max_trials: max number of trials per one iteration
+           step: num of glomeruli between iterations
+           mask_glom_value: mask pixel value containing glomerulus
+        """
+
+        assert img_wh == mask_wh, "Image and mask wh should be identical"
+        self._anot_struct_json = jread(img_anot_struct_path)
+        self._mask = rasterio.open(mask_path)
+        self._img = rasterio.open(img_path)
+        self._img_wh = img_wh
+        self._mask_wh = mask_wh
+        self._num_samples = num_samples
+        self._mask_glom_val = mask_glom_val
+        self._bands_img = (1, 2, 3)
+        self._bands_mask = 1
+        self._count = -1
+        self._step = step
+        self._max_trials = max_trials
+        # Get list of centroids
+        self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
+
+    def gen_backgr_pt(self) -> Tuple[int, int]:
+        """Generate background point.
+        Idea is to take only <self._max_trials> trials, if point is not found, then increment permissible
+        num of glomeruli inside background by <self._step>.
+        """
+
+        n_glom_in_backgr, trial = 0, 0
+
+        while True:
+            cortex_polygons = get_cortex_polygons(self._anot_struct_json)
+            cortex_num = random.randint(0, len(cortex_polygons) - 1)
+            rand_pt = gen_pt_in_poly(cortex_polygons[cortex_num])
+            x_cent, y_cent = np.array(rand_pt).astype(int)
+            x_off, y_off = x_cent - self._mask_wh[0] // 2, y_cent - self._mask_wh[1] // 2
+            window_mask = Window(x_off, y_off, *self._mask_wh)
+            sample_mask = self._mask.read(self._bands_mask, window=window_mask)
+
+            if np.sum(sample_mask) <= n_glom_in_backgr * self._mask_glom_val:
+                return x_cent, y_cent
+            elif trial == self._max_trials:
+                trial, n_glom_in_backgr = 0, n_glom_in_backgr + self._step
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return self._num_samples
+
+    def __next__(self):
+        self._count += 1
+        if self._count < self._num_samples:
+            return self.__getitem__(self._count)
+        else:
+            self._count = -1
+            raise StopIteration("Failed to proceed to the next step")
+
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+        x_off_img = self._centroids[idx][0] - self._img_wh[0] // 2
+        y_off_img = self._centroids[idx][1] - self._img_wh[1] // 2
+
+        x_off_mask = self._centroids[idx][0] - self._mask_wh[0] // 2
+        y_off_mask = self._centroids[idx][1] - self._mask_wh[1] // 2
+
+        window_img = Window(x_off_img, y_off_img, *self._img_wh)
+        window_mask = Window(x_off_mask, y_off_mask, *self._mask_wh)
+        img = self._img.read(self._bands_img, window=window_img)
+        mask = self._mask.read(self._bands_mask, window=window_mask)
+        return img, mask
+
+    def __del__(self):
+        del self._anot_struct_json
         del self._mask
         del self._img
 

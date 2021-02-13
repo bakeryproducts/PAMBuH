@@ -14,6 +14,7 @@ import rasterio
 import numpy as np
 from shapely import geometry
 import itertools
+import random
 
 from config import cfg
 
@@ -185,3 +186,20 @@ def tiff_merge_mask(path_tiff, path_mask, path_dst):
     dst.write(img, [1,2,3]) # 3 bands
     dst.close()
     del dst
+
+
+def gen_pt_in_poly(polygon: geometry.Polygon,
+                   max_num_attempts=50) -> geometry.Point:
+    """Generate randomly point within given polygon. If after max_num_attempts point has been not
+    found, then return centroid of polygon.
+    """
+
+    min_x, min_y, max_x, max_y = polygon.bounds
+
+    num_attempts = 0
+    while True:
+        random_point = geometry.Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
+        if random_point.within(polygon): return random_point
+        elif num_attempts < max_num_attempts: num_attempts += 1
+        else: return polygon.centroid
+

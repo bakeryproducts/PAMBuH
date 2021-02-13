@@ -1,20 +1,20 @@
 import os
 import json
+import random
 import argparse
 import datetime
+import itertools
 from pathlib import Path
 from functools import partial
 import multiprocessing as mp
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
-from rasterio.windows import Window
+
 import cv2
 import torch
 import rasterio
 import numpy as np
 from shapely import geometry
-import itertools
-import random
 
 from config import cfg
 
@@ -110,14 +110,11 @@ def get_basics_rasterio(name):
 
 def get_tiff_block(ds, x, y, h, w=None, bands=3):
     if w is None: w = h
-    return ds.read(list(range(1, bands+1)), window=Window(x, y, h, w))
+    return ds.read(list(range(1, bands+1)), window=rasterio.windows.Window(x, y, h, w))
 
 def save_tiff_uint8_single_band(img, path):
-    if isinstance(img, torch.Tensor):
-        img = np.array(img)
-    elif not isinstance(img, np.ndarray):
-        raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
     assert img.dtype == np.uint8
+    if img.max() <= 1. : print(f"Warning: saving tiff with max value is <= 1, {path}")
     h, w = img.shape
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
     dst.write(img, 1)

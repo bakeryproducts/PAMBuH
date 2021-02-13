@@ -101,6 +101,9 @@ class BackgroundSampler:
         self._count = -1
         self._step = step
         self._max_trials = max_trials
+
+        # Read rasterio mask once
+        self._mask = self._mask.read(1)
         # Get list of centroids
         self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
 
@@ -118,8 +121,7 @@ class BackgroundSampler:
             rand_pt = gen_pt_in_poly(cortex_polygons[cortex_num])
             x_cent, y_cent = np.array(rand_pt).astype(int)
             x_off, y_off = x_cent - self._mask_wh[0] // 2, y_cent - self._mask_wh[1] // 2
-            window_mask = Window(x_off, y_off, *self._mask_wh)
-            sample_mask = self._mask.read(self._bands_mask, window=window_mask)
+            sample_mask = self._mask[y_off: y_off+self._mask_wh[1], x_off: x_off+self._mask_wh[0]]
 
             if np.sum(sample_mask) <= n_glom_in_backgr * self._mask_glom_val:
                 return x_cent, y_cent
@@ -148,9 +150,8 @@ class BackgroundSampler:
         y_off_mask = self._centroids[idx][1] - self._mask_wh[1] // 2
 
         window_img = Window(x_off_img, y_off_img, *self._img_wh)
-        window_mask = Window(x_off_mask, y_off_mask, *self._mask_wh)
+        mask = self._mask[y_off_mask: y_off_img + self._mask_wh[1], x_off_mask: x_off_mask + self._mask_wh[0]]
         img = self._img.read(self._bands_img, window=window_img)
-        mask = self._mask.read(self._bands_mask, window=window_mask)
         return img, mask
 
     def __del__(self):

@@ -1,36 +1,29 @@
 import os
-import json
-
-from shapely import geometry
-import utils
-from utils import jread, jdump, json_record_to_poly, get_cortex_polygs
-from pathlib import Path, PurePath
+from utils import jread, jdump, json_record_to_poly, get_cortex_polygons
+from pathlib import Path
 
 
-def filt_glom_by_cortex(img_name: str, json_path_in: str, json_path_out: str, suffix: str = '.json',
-                        postfix_anot_in: str = "-anatomical-structure",
-                        postfix_img_out: str = "_prep") -> None:
-    """ Filter glomerulus by location in Cortex. Load -> Filter -> Save.
+def filt_glom_by_cortex(records_path_in: str, anot_struct_path_in: str, records_path_out: str) -> None:
+    """ Filter glomeruli by location in Cortex. Load -> Filter -> Save.
     """
 
-    assert json_path_in != json_path_out or postfix_img_out != "", "Please change paths or postfix to " \
-                                                                   "avoid overwriting input files"
+    assert records_path_in != records_path_out, "Please change paths to avoid overwriting input files"
 
-    gloms_json = jread(PurePath(json_path_in, img_name + suffix))
-    anot_structs_json = jread(PurePath(json_path_in, img_name + postfix_anot_in + suffix))
+    records_json = jread(Path(records_path_in))
+    anot_structs_json = jread(Path(anot_struct_path_in))
 
     # Get list of Cortex polygons
-    cortex_polygs = utils.get_cortex_polygs(anot_structs_json)
-    assert len(cortex_polygs) != 0, "No Cortex"
+    cortex_polygons = get_cortex_polygons(anot_structs_json)
+    assert len(cortex_polygons) != 0, "No Cortex"
 
-    filt_gloms_json = []
-    for record in gloms_json:
-        polygs = utils.json_record_to_poly(record)
-        # If at least one polygon intersects with at least one Сortex polygon, then append to filt_gloms_json
-        if any([polyg.intersects(cortex_polyg) for cortex_polyg in cortex_polygs for polyg in polygs]):
-            filt_gloms_json.append(record)
-    assert len(filt_gloms_json) != 0, "No intersections are found"
-    print(f"{len(gloms_json) - len(filt_gloms_json)} glomerulus are removed in {img_name} ")
+    filt_records_json = []
+    for record in records_json:
+        polygons = json_record_to_poly(record)
+        # If at least one polygon intersects with at least one Сortex polygon, then append to filt_records_json
+        if any([polyg.intersects(cortex_polygon) for cortex_polygon in cortex_polygons for polyg in polygons]):
+            filt_records_json.append(record)
+    assert len(filt_records_json) != 0, "No intersections are found"
+    print(f"{len(records_json) - len(filt_records_json)} glomerulus are removed")
 
-    os.makedirs(Path(json_path_out), exist_ok=True)
-    jdump(filt_gloms_json, PurePath(json_path_out, img_name + postfix_img_out + suffix))
+    os.makedirs(Path(records_path_out).parent, exist_ok=True)
+    jdump(filt_records_json, Path(records_path_out))

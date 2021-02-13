@@ -7,12 +7,14 @@ from functools import partial
 import multiprocessing as mp
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
-
+from rasterio.windows import Window
 import cv2
 import torch
 import rasterio
 import numpy as np
 from shapely import geometry
+import itertools
+import random
 
 from config import cfg
 
@@ -55,22 +57,22 @@ def polyg_to_mask(polyg: np.ndarray, wh: Tuple[int, int], fill_value: int) -> np
 
 
 def json_record_to_poly(record: Dict) -> List[geometry.Polygon]:
-    """Get list of polygs from record.
+    """Get list of polygons from record.
     """
 
-    num_polygs = len(record['geometry']['coordinates'])
-    if num_polygs == 1:     # Polygon
+    num_polygons = len(record['geometry']['coordinates'])
+    if num_polygons == 1:     # Polygon
         list_coords = [record['geometry']['coordinates'][0]]
-    elif num_polygs > 1:    # MultiPolygon
-        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygs)]
+    elif num_polygons > 1:    # MultiPolygon
+        list_coords = [record['geometry']['coordinates'][i][0] for i in range(num_polygons)]
     else:
         raise Exception("No polygons are found")
 
     try:
-        polygs = [geometry.Polygon(coords) for coords in list_coords]
+        polygons = [geometry.Polygon(coords) for coords in list_coords]
     except Exception as e:
         print(e, list_coords)
-    return polygs
+    return polygons
 
 
 def make_folders(cfg):
@@ -90,12 +92,12 @@ def make_folders(cfg):
 
 def save_models(d, postfix, output_folder):
     for k, v in d.items():
-        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl")) 
+        torch.save(v.state_dict(), output_folder/os.path.join("models",f"{k}_{postfix}.pkl"))
 
 def dump_params(cfg, output_path):
     with open(os.path.join(output_path, 'cfg.yaml'), 'w') as f:
         f.write(cfg.dump())
-        
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", default=0, type=int)
@@ -106,30 +108,21 @@ def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
 
-def read_frame(fd, x, y, h, w=None, c=3):
-    # CHTO ETO ZA HUYNA? TARANTINO TI OPYAT' VYHODISH NA SVYAZ'???
-    # ds = rasterio.open(path) ### ds stands for dataset, common name for gdal-like readers
-    # w,h=1024,1024
-    # bands = [1,2,3] ### bands stands for channels, common name for gdal-like readers
-    # block = ds.read([1,2,3], window=((x,x+w),(y,y+h))) ### as block read
-    # BLOCK is common name for gdal-like readers:  https://gis.stackexchange.com/questions/158527/reading-raster-files-by-block-with-rasterio/158528
-    # FRAME IS WTF IS FRAME???
-    if w is None: w = h # WTF IS THIS
-    img = fd.read(list(range(1, c+1)), window=Window(x, y, h, w))
-    return torch.ByteTensor(img)# TORCH BYTE TENSOR??? read_frame should be get_tiff_block_by_coordinates_and_convert_to_byte_tensor???
+def get_tiff_block(ds, x, y, h, w=None, bands=3):
+    if w is None: w = h
+    return ds.read(list(range(1, bands+1)), window=Window(x, y, h, w))
 
 def save_tiff_uint8_single_band(img, path):
-    # NAHUYA SOHRANYALKE TIFF FILOV vpizdu koroch 
     if isinstance(img, torch.Tensor):
         img = np.array(img)
-    elif not isinstance(img, numpy.ndarray):
+    elif not isinstance(img, np.ndarray):
         raise TypeError(f'Want torch.Tensor or numpy.ndarray, but got {type(img)}')
     assert img.dtype == np.uint8
     h, w = img.shape
     dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
-    dst.write(img, 1) # 1 band
+    dst.write(img, 1)
     dst.close()
-    print(f'Save to {path}') 
+    print(f'Save to {path}')
     del dst
 
 def cfg_frz(func):
@@ -137,7 +130,7 @@ def cfg_frz(func):
         cfg.defrost()
         r = func(*args, **kwargs)
         cfg.freeze()
-        return r 
+        return r
     return frz
 
 @contextmanager
@@ -145,7 +138,7 @@ def poolcontext(*args, **kwargs):
     pool = mp.Pool(*args, **kwargs)
     yield pool
     pool.terminate()
-    
+
 def mp_func(foo, args, n):
     args_chunks = [args[i:i + n] for i in range(0, len(args), n)]
     with poolcontext(processes=n) as pool:
@@ -164,24 +157,49 @@ def mp_func_gen(foo, args, n, progress=None):
     return results
 
 
-def get_cortex_polygs(anot_structs_json: Dict) -> List[geometry.Polygon]:
-    """ Get list of cortex polygons from anot_structs_json.
+def get_cortex_polygons(anot_structs_json: Dict) -> List[geometry.Polygon]:
+    """ Gets list of cortex polygons from anot_structs_json.
     """
 
-    cortex_polygs = []
+    cortex_polygons = []
     for record in anot_structs_json:
         if record['properties']['classification']['name'] == 'Cortex':
-            cortex_polygs += json_record_to_poly(record)
-    return cortex_polygs
+            cortex_polygons += json_record_to_poly(record)
+    return cortex_polygons
+
+
+def flatten_2dlist(list2d: List) -> List:
+    """Converts 2d list into 1d list.
+    """
+
+    list1d = list(itertools.chain(*list2d))
+    return list1d
 
 def tiff_merge_mask(path_tiff, path_mask, path_dst):
     # will use shitload of mem
     img = rasterio.open(path_tiff).read()
     mask = rasterio.open(path_mask).read()
-    assert mask.max() <= 1 + 1e-6 
+    assert mask.max() <= 1 + 1e-6
     img[1,...] = mask*200
     _, h, w = img.shape
     dst = rasterio.open(path_dst, 'w', driver='GTiff', height=h, width=w, count=3, dtype=np.uint8)
     dst.write(img, [1,2,3]) # 3 bands
     dst.close()
     del dst
+
+
+def gen_pt_in_poly(polygon: geometry.Polygon,
+                   max_num_attempts=50) -> geometry.Point:
+    """Generates randomly point within given polygon. If after max_num_attempts point has been not
+    found, then returns centroid of polygon.
+    """
+
+    min_x, min_y, max_x, max_y = polygon.bounds
+
+    num_attempts = 0
+    while True:
+        random_point = geometry.Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
+        if random_point.within(polygon): return random_point
+        elif num_attempts < max_num_attempts: num_attempts += 1
+        else: return polygon.centroid
+

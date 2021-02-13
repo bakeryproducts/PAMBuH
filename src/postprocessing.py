@@ -14,7 +14,6 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 from utils import get_basics_rasterio, get_tiff_block, save_tiff_uint8_single_band
-import sampler
 from rle2tiff import mask2rle
 
 def chunks(lst, n):
@@ -23,7 +22,7 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 
-def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size: int = 2000, batch_size: int = 4, device : str = 'cuda:2') -> np.ndarray:
+def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size: int = 2000, batch_size: int = 4, device : str = 'cuda') -> np.ndarray:
 	""" Giga Function doing everything. made by galayda 
 
 	Args:
@@ -64,14 +63,14 @@ def read_and_process_img(path: str, do_infer, block_size: int = 2048, crop_size:
 				masks_list.insert(i, torch.zeros((crop_size, crop_size)).to(device))
 			mask_row = torch.cat(masks_list, 1)[:, :w]
 		else:
-			mask_row = torch.zeros((crop_size, w))
-		rows.append(mask_row.to(device))
+			mask_row = torch.zeros((crop_size, w)).to(device)
+		rows.append(mask_row)
 	mask = torch.cat(rows, 0)[:h, :w]
 	assert mask.shape == (h, w)
 	return mask
 
 def float_mask2_01uint8(mask, threshold=0.5):
-	return torch.as_tensor(mask > threshold, dtype=torch.int8).to(mask.device)
+	return torch.as_tensor(mask > threshold, dtype=torch.int8)
 
 def _plot_img(img: np.ndarray) -> NoReturn:
 	print(img.shape)
@@ -95,71 +94,7 @@ def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str) -> N
 		spamwriter.writerow(['id', 'predicted'])
 		for img_name in tqdm(imgs_name, desc='Test images', leave=False):
 			mask = read_and_process_img(img_name, infer_func)
-			save_tiff_uint8_single_band(np.uint8((mask*255).to('cpu')), dst_folder / img_name.name)
-			spamwriter.writerow([img_name.stem, mask2rle(float_mask2_01uint8(mask).to('cpu'))])
-
-class SmoothTiles:
-	"""WTF are we using this? 
-	"""	
-	def __init__(self, window_fun: str = 'triangle', cuda: bool = True) -> NoReturn:
-		self.window_fun_name = window_fun
-		self.get_window_fun()
-		self.cuda = cuda and torch.cuda.is_available()
-
-	def __call__(self, img_main: torch.float, img_sub: torch.float) -> torch.float:
-		return self.merge(img_main, img_sub)
-
-	def __repr__(self) -> NoReturn: return f'Name of window funcion: {self.window_fun_name}'
-
-	def get_window_fun(self) -> NoReturn:
-		self.window_fun = {
-			'triangle': self.triangle,
-			'gauss': self.gauss,
-			'spline': self.spline
-		}[self.window_fun_name]
-
-	def spline(self, window_size: int, power: float = 2) -> np.array:
-		intersection = int(window_size/4)
-		wind_outer = (abs(2*(self.triangle(window_size))) ** power)/2
-		wind_outer[intersection:-intersection] = 0
-
-		wind_inner = 1 - (abs(2*(self.triangle(window_size) - 1)) ** power)/2
-		wind_inner[:intersection] = 0
-		wind_inner[-intersection:] = 0
-		wind = wind_inner + wind_outer
-		return wind
-
-	def gauss(self, window_size: int, std: float = None) -> np.array:
-		if std is None: std = window_size/4
-		n = np.arange(0, window_size) - (window_size - 1.0) / 2.0
-		return np.exp(-n**2/(2*std*std))
-
-	def triangle(self, window_size: int) -> np.array:
-		n = np.arange(1, (window_size + 1) // 2 + 1)
-		if window_size % 2 == 0:
-			w = (2 * n - 1.0) / window_size
-			w = np.r_[w, w[::-1]]
-		else:
-			w = 2*n/(window_size + 1.0)
-			w = np.r_[w, w[-2::-1]]
-		return w
-
-	def window_2D(self, window_size: int, window=None) -> np.array:
-		if window is None: window = self.window_fun
-		wind = window(window_size)
-		wind = np.expand_dims(wind, 1)
-		wind = wind * wind.transpose(1, 0)
-		return wind
-
-	def merge(self, img_main: np.array, img_sub: np.array) -> np.array:
-		n = int(np.sqrt(img_sub.shape[-1]))
-		m = img_sub.shape[0]
-		img_sub = torch.reshape( img_sub, (img_sub.shape[0], img_sub.shape[1], n, n))
-		top = torch.cat( (img_sub[:, :, :-1, :-1], img_sub[:, :, 1:, :-1]), axis=0)
-		down = torch.cat( (img_sub[:, :, :-1, 1:], img_sub[:, :, 1:, 1:]), axis=0)
-		mean = torch.cat((top, down), axis=1)
-		img_sub = torch.reshape(mean[m//2:-m//2, m//2:-m//2], (img_sub.shape[0], img_sub.shape[1], -1))
-		main = self.window_2D(img_main.shape[0])
-		tensor = torch.cuda.FloatTensor if self.cuda else torch.FloatTensor
-		main = tensor(np.repeat(np.expand_dims(main, 2), img_sub.shape[-1], axis=2))
-		return main*img_main + (1-main)*img_sub
+			mask01 = np.uint8(float_mask2_01uint8(mask).to('cpu'))
+			#save_tiff_uint8_single_band(mask01, dst_folder / img_name.name)
+			spamwriter.writerow([img_name.stem, mask2rle(mask01.T)])
+	print(f'save to {dst_folder / "sample_submission.csv"}')

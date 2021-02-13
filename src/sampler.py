@@ -1,5 +1,5 @@
-import json
 from PIL import Image
+from shapely import geometry
 from typing import List, Tuple
 import random 
 import numpy as np
@@ -75,27 +75,33 @@ class BackgroundSampler:
     def __init__(self,
                  img_path: str,
                  mask_path: str,
-                 img_anot_struct_path: str,
+                 polygons: List[geometry.Polygon],
                  img_wh: Tuple[int, int],
                  mask_wh: Tuple[int, int],
                  num_samples: int,
                  step: int = 25,
                  max_trials: int = 25,
-                 mask_glom_val: int = 255) -> Tuple[np.ndarray, np.ndarray]:
+                 mask_glom_val: int = 255,
+                 buffer_dist: int = 0) -> Tuple[np.ndarray, np.ndarray]:
         """
            max_trials: max number of trials per one iteration
            step: num of glomeruli between iterations
            mask_glom_value: mask pixel value containing glomerulus
+
+        Example:
+            # Get list of cortex polygons
+            polygons = utils.get_cortex_polygons(utils.jread(img_anot_struct_path))
         """
 
         assert img_wh == mask_wh, "Image and mask wh should be identical"
-        self._cortex_polygons = get_cortex_polygons(jread(img_anot_struct_path))
         self._mask = rasterio.open(mask_path)
         self._img = rasterio.open(img_path)
+        self._polygons = polygons
         self._img_wh = img_wh
         self._mask_wh = mask_wh
         self._num_samples = num_samples
         self._mask_glom_val = mask_glom_val
+        self._buffer_dist = buffer_dist
         self._bands_img = (1, 2, 3)
         self._bands_mask = 1
         self._count = -1
@@ -104,6 +110,8 @@ class BackgroundSampler:
 
         # Read rasterio mask once
         self._mask = self._mask.read(1)
+        # Dilate polygs
+        self._polygons = [polyg.buffer(self._buffer_dist) for polyg in self._polygons]
         # Get list of centroids
         self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
 
@@ -116,10 +124,11 @@ class BackgroundSampler:
         glom_presence_in_backgr, trial = 0, 0
 
         while True:
-            cortex_polygon = random.choice(self._cortex_polygons)
-            rand_pt = gen_pt_in_poly(cortex_polygon)
+            polygon = random.choice(self._polygons)
+            rand_pt = gen_pt_in_poly(polygon)
             x_cent, y_cent = np.array(rand_pt).astype(int)
             x_off, y_off = x_cent - self._mask_wh[0] // 2, y_cent - self._mask_wh[1] // 2
+            # Reverse x and y, because gdal return C H W
             sample_mask = self._mask[y_off: y_off+self._mask_wh[1], x_off: x_off+self._mask_wh[0]]
 
             if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
@@ -149,6 +158,7 @@ class BackgroundSampler:
         y_off_mask = self._centroids[idx][1] - self._mask_wh[1] // 2
 
         window_img = Window(x_off_img, y_off_img, *self._img_wh)
+        # Reverse x and y, because gdal return C H W
         mask = self._mask[y_off_mask: y_off_img + self._mask_wh[1], x_off_mask: x_off_mask + self._mask_wh[0]]
         img = self._img.read(self._bands_img, window=window_img)
         return img, mask

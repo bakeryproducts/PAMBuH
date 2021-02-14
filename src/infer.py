@@ -56,11 +56,15 @@ def get_infer_func(root):
         img is HWC (because of transforms)
         Returns torch tensor on CUDA, [len(inp), 1, H, W]
     """
-    root = Path(root)
-    sys.path.append(str(root / 'src'))
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("model", str(root)+'src/model.py')
+    nn_model = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(nn_model)
 
+    root = Path(root)
+    #sys.path.append(str(root) + 'src')
     import augs
-    import model as nn_model
+    #import model as nn_model
     from config import cfg, cfg_init
 
     cfg_init(str(root / 'cfg.yaml'))
@@ -75,5 +79,7 @@ def get_infer_func(root):
     model = model.cuda()
 
     return partial(_infer_func, transform=transform, model=model)
+
+
 
 

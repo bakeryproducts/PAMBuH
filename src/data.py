@@ -7,10 +7,11 @@ from contextlib import contextmanager
 
 import cv2
 import torch
-from torch.utils.data import DataLoader
 import numpy as np
 from tqdm.auto import tqdm
 import albumentations as albu
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import ConcatDataset as TorchConcatDataset
 
 import utils
 import augs
@@ -76,6 +77,7 @@ def init_datasets(cfg):
 
         "train1024x05": SegmentDataset(DATA_DIR/'split1024x05/train/imgs', DATA_DIR/'split1024x05/train/masks'),
         "val1024x05": SegmentDataset(DATA_DIR/'split1024x05/val/imgs', DATA_DIR/'split1024x05/val/masks'),
+        "backs_30_1024": SegmentDataset(DATA_DIR/'backs030/imgs', DATA_DIR/'backs030/masks'),
     }
     return  DATASETS
 
@@ -86,8 +88,8 @@ def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST'])
         datasets_strings = data_field.DATASETS
         if datasets_strings:
             datasets = [all_datasets[ds] for ds in datasets_strings]
-            #ds = ConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
-            ds = datasets[0]
+            ds = TorchConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
+            #ds = datasets[0]
             converted_datasets[dataset_type] = ds
     return converted_datasets
 

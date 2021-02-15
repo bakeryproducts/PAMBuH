@@ -9,7 +9,7 @@ from functools import partial
 import pandas as pd
 import numpy as np
 import rasterio as rio
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 import utils
 import rle2tiff
@@ -79,7 +79,7 @@ def mask_q_writer(q, H, W, total_blocks, root, result):
     do_inference = infer.get_infer_func(root)
     mask = np.zeros((1,H,W)).astype(np.uint8)
     count = 0
-    bs = 16
+    bs = 8
     batch = []
     
     while count < total_blocks:
@@ -107,7 +107,7 @@ def mask_q_writer(q, H, W, total_blocks, root, result):
             print(e)
             break
     if batch:
-        print('Drop last batch', len(batch))
+        #print('Drop last batch', len(batch))
         batch = []
     
     result['mask'] = mask
@@ -164,8 +164,10 @@ if __name__ == '__main__':
     os.environ['CPL_LOG'] = '/dev/null'
 
     #model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
-    model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
-    block_size = 1024
+    #model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
+    model_folder = 'output/2021_Feb_15_15_06_52_PAMBUH/'
+    
+    block_size = 2048
     pad = 0
     threshold = 200
     save_predicts = True

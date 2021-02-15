@@ -21,7 +21,8 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     dls = build_dataloaders(cfg, datasets, pin=True, drop_last=False)
     model, opt = build_model(cfg)
 
-    criterion = torch.nn.BCEWithLogitsLoss()
+    #criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = partial(focal_loss,  gamma=2)# from callbacks
     
     logger.log("DEBUG", 'INIT CALLBACKS') 
     train_cb = TrainCB(logger=logger, use_cuda=use_cuda)
@@ -46,7 +47,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
-    l0,l1,l2 = 5e-5, 4e-4,5e-5
+    l0,l1,l2 = 5e-5, 2e-4,5e-5
     scale = 1 #1/ cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale

@@ -25,6 +25,7 @@ class Augmentator:
         elif kind == 'val_forced': return self.aug_val_forced()
         elif kind == 'test': return self.aug_test ()
         elif kind == 'light': return self.aug_light()
+        elif kind == 'light_scale': return self.aug_light_scale()
         elif kind == 'blank': return self.aug_blank()
         elif kind == 'resize': return self.resize()
         elif kind == 'wocrop': return self.aug_wocrop()
@@ -38,13 +39,18 @@ class Augmentator:
                 albu.RandomCrop(self.crop_h,self.crop_w)
                 #albu.CropNonEmptyMaskIfExists(h,w)
             ], p=1)    
+
+    def crop_scale(self):
+        return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.2,1))
+
     
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
-
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
+
+    def aug_light_scale(self): return self.compose([self.crop_scale(), albu.Flip(), albu.RandomRotate90(), self.norm()])
 
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])

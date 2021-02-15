@@ -164,7 +164,6 @@ class BackgroundSampler:
         return img, mask
 
     def __del__(self):
-        del self._anot_struct_json
         del self._mask
         del self._img
 

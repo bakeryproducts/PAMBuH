@@ -56,6 +56,11 @@ _____________
     - Docker
     - Focal loss
     - TTA
+    - ShiftScaleRotate
+    - do padding in postp
+    - weight decay
+    - tencent 
+    - backgrounds
     - 
 
 

@@ -1,9 +1,12 @@
 import os
+import json
+import cv2
 import sys
 from pathlib import Path
 import multiprocessing as mp
 from functools import partial
 
+import pandas as pd
 import numpy as np
 import rasterio as rio
 from tqdm.auto import tqdm
@@ -76,7 +79,7 @@ def mask_q_writer(q, H, W, total_blocks, root, result):
     do_inference = infer.get_infer_func(root)
     mask = np.zeros((1,H,W)).astype(np.uint8)
     count = 0
-    bs = 8
+    bs = 16
     batch = []
     
     while count < total_blocks:
@@ -126,7 +129,7 @@ def launch_mpq(p, model_folder, block_size=512, pad=16, num_processes=1, show_tq
     #assert len(reader_args) == num_processes
     reader = partial(mp_func_wrapper, image_q_reader)
     
-    total_blocks = len(reader_args)
+    total_blocks = len(cds)
     writer = partial(mp_func_wrapper, mask_q_writer)
 
     writer_p = mp.Process(target=writer, args=((q,H,W,total_blocks, model_folder, result),))
@@ -145,38 +148,59 @@ def launch_mpq(p, model_folder, block_size=512, pad=16, num_processes=1, show_tq
     print(mask.shape, mask.dtype, mask.max())
     return mask
 
+def filter_mask(mask, name):
+    with open(str(name.with_suffix(''))+ '-anatomical-structure.json', 'r') as f:
+        data = json.load(f)
+    h,w = mask.shape
+    cortex_rec = [r for r in data if r['properties']['classification']['name'] == 'Cortex']
+    cortex_poly = np.array(cortex_rec[0]['geometry']['coordinates'])
+    buf = np.zeros((h,w), dtype=np.uint8)
+    cv2.fillPoly(buf, np.array(cortex_poly), 1)
+    mask = mask * buf
+    return mask
 
 if __name__ == '__main__':
     import infer
     os.environ['CPL_LOG'] = '/dev/null'
 
-    model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
-    block_size = 2048
+    #model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
+    model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
+    block_size = 1024
     pad = 0
     threshold = 200
     save_predicts = True
     join_predicts = True
 
-    src = Path('input/hm/train')
+    src = Path('input/hm/test')
     img_names = src.glob('*.tiff')
     dst = Path('output/predicts')
+    df = pd.read_csv('input/hm/sample_submission.csv', index_col='id')
+    img_names = list(img_names)
+    #print(list(img_names))
 
     for img_name in img_names:
+        #img_name = img_names[-1]
         print(f'Creating mask for {img_name}')
-        mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=1)
-        mask[mask<threshold] = 0
-        mask = mask.clip(1)
+        mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=8, qsize=32)[0]
 
-        rle2tiff.mask2rle(mask)
-        
+        mask = filter_mask(mask, img_name)
+
+        mask[mask<threshold] = 0
         if save_predicts:
             out_name = dst/img_name.name
-            utils.save_tiff_uint8_single_band(mask[0], str(out_name))
+            utils.save_tiff_uint8_single_band(mask, str(out_name))
             if join_predicts:
                 merge_name = dst/'merged'/img_name.name
                 utils.tiff_merge_mask(img_name, str(out_name), merge_name)
 
-        break
+        print('Done , to RLE:')
+        mask = mask.clip(0,1)
+        rle = rle2tiff.mask2rle(mask)
+        df.loc[img_name.stem] = rle
+        print('All')
+        
+        #break
+    df.to_csv('submission.csv')
     
 
 

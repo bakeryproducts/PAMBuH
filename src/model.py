@@ -62,10 +62,11 @@ class downsample_block(nn.Module):
                 ]))
     def forward(self, x): return self.block(x)
 
+
 class seg_attention_block(nn.Module):
     """https://arxiv.org/pdf/1804.03999.pdf"""
-    def __init__(self, fg, fl, fint):
-        super(Attention_block, self).__init__()
+    def __init__(self, fg, fl, fint, name='att'):
+        super(seg_attention_block, self).__init__()
         name1 = name +'_gate_'
         self.wg = nn.Sequential(OrderedDict([
                                 (name1+'conv',nn.Conv2d(fg, fint, kernel_size=1,stride=1,padding=0,bias=False)),
@@ -92,11 +93,11 @@ class seg_attention_block(nn.Module):
         psi = self.relu(g1+x1)
         psi = self.psi(psi)
         return x*psi
-
-
-class _base_unet(nn.Module):
+    
+    
+class _base_enc_unet(nn.Module):
     def __init__(self, in_channels=3, out_channels=1, init_features=32):
-        super(_base_unet, self).__init__()
+        super(_base_enc_unet, self).__init__()
         self.init_features = init_features
         self.out_channels = out_channels
         self.in_channels = in_channels
@@ -112,6 +113,26 @@ class _base_unet(nn.Module):
         self.downsample4 = downsample_block(8*f,8*f,'d4')
         self.bottleneck = conv_block(8*f, 16*f, 'bottleneck')
         
+    def cat(self, a,b):
+        # cat with fixed shape
+        min_x = min(a.shape[-2], b.shape[-2])
+        min_y = min(a.shape[-1], b.shape[-1])
+        return torch.cat((a[...,:min_x, :min_y], b[...,:min_x, :min_y]), dim=1)
+        
+    def forward_encoding(self, x):
+        e1 = self.e1(x)
+        e2 = self.e2(self.downsample1(e1))
+        e3 = self.e3(self.downsample2(e2))
+        e4 = self.e4(self.downsample3(e3))
+        bottleneck = self.bottleneck(self.downsample4(e4))
+        return e1,e2,e3,e4,bottleneck
+
+    
+class _base_unet(_base_enc_unet):
+    def __init__(self, *args, **kwargs):
+        super(_base_unet, self).__init__( *args, **kwargs)
+        f = self.init_features
+        
         self.upsample4 = nn.ConvTranspose2d(f*16, f*8, kernel_size=2, stride=2)
         self.d4 =  conv_block(16*f, 8*f, 'd4')
         self.upsample3 = nn.ConvTranspose2d(f*8, f*4, kernel_size=2, stride=2)
@@ -121,42 +142,63 @@ class _base_unet(nn.Module):
         self.upsample1 = nn.ConvTranspose2d(f*2, f, kernel_size=2, stride=2)
         self.d1 =  conv_block(2*f, f, 'd1')
 
-    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
- 
-    def cat(self, a,b):
-        # cat with fixes shape
-        min_x = min(a.shape[-2], b.shape[-2])
-        min_y = min(a.shape[-1], b.shape[-1])
-        return torch.cat((a[...,:min_x, :min_y], b[...,:min_x, :min_y]), dim=1)
-
-    def forward(self,x):
-        # encoding path
-        e1 = self.e1(x)
-        e2 = self.e2(self.downsample1(e1))
-        e3 = self.e3(self.downsample2(e2))
-        e4 = self.e4(self.downsample3(e3))
-        bottleneck = self.bottleneck(self.downsample4(e4))
+    def forward(self, x):
+        e1,e2,e3,e4,bottleneck = self.forward_encoding(x)
         
         # decoding + concat path
         d4 = self.upsample4(bottleneck) 
         d4 = self.d4(self.cat(d4,e4))
         
-        d3 = self.upsample3(d4) 
+        d3 = self.upsample3(d4)
         d3 = self.d3(self.cat(d3,e3))
         
         d2 = self.upsample2(d3) 
         d2 = self.d2(self.cat(d2,e2))
         
-        d1 = self.upsample1(d2) 
+        d1 = self.upsample1(d2)
         d1 = self.d1(self.cat(d1,e1))
-        
         return d1
+
+class att_unet(_base_unet):
+    def __init__(self, in_channels=3, out_channels=1, init_features=32):
+        super(att_unet, self).__init__(in_channels, out_channels, init_features)
+        f = self.init_features
+        self.ag4 = seg_attention_block(f*8, f*8, f*4, 'att4')
+        self.ag3 = seg_attention_block(f*4, f*4, f*2, 'att3')
+        self.ag2 = seg_attention_block(f*2, f*2, f, 'att2')
+        self.ag1 = seg_attention_block(f, f, f, 'att1')
+        self.conv_1x1 = nn.Conv2d(f, self.out_channels, kernel_size=1,stride=1,padding=0)
+    
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
+    
+    def forward(self, x):
+        e1,e2,e3,e4,bottleneck = self.forward_encoding(x)
+        
+        d4 = self.upsample4(bottleneck) 
+        ea4 = self.ag4(d4, e4)
+        d4 = self.d4(self.cat(d4,ea4))
+        
+        d3 = self.upsample3(d4)
+        ea3 = self.ag3(d3, e3)
+        d3 = self.d3(self.cat(d3,ea3))
+        
+        d2 = self.upsample2(d3) 
+        ea2 = self.ag2(d2, e2)
+        d2 = self.d2(self.cat(d2,ea2))
+        
+        d1 = self.upsample1(d2)
+        ea1 = self.ag1(d1, e1)
+        d1 = self.d1(self.cat(d1,ea1))
+        
+        return self.conv_1x1(d1)
 
 
 class Unet(_base_unet):
     def __init__(self, *args, **kwargs):
         super(Unet, self).__init__( *args, **kwargs)
         self.conv_1x1 = nn.Conv2d(self.init_features, self.out_channels, kernel_size=1,stride=1,padding=0)
+    
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
     
     def forward(self, x):
         x = super(Unet, self).forward(x)
@@ -169,6 +211,8 @@ class Unet_x05(_base_unet):
         self.downsample21 = downsample_block(f,f,'d21')
         self.e21 = conv_block(f, f, 'e21')
         self.conv_1x1 = nn.Conv2d(f, self.out_channels, kernel_size=1,stride=1,padding=0)
+    
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
     
     def forward(self, x):
         x = super(Unet_x05, self).forward(x)
@@ -184,6 +228,8 @@ class Unet_x025(_base_unet):
         self.downsample22 = downsample_block(2*f,2*f,'d22')
         self.e22 = conv_block(2*f, 2*f, 'e22')
         self.conv_1x1 = nn.Conv2d(f, self.out_channels, kernel_size=1,stride=1,padding=0)
+    
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
     
     def forward(self, x):
         x = super(Unet_x025, self).forward(x)

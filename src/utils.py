@@ -108,9 +108,9 @@ def get_basics_rasterio(name):
     file = rasterio.open(str(name))
     return file, file.shape, file.count
 
-def get_tiff_block(ds, x, y, h, w=None, bands=3):
-    if w is None: w = h
-    return ds.read(list(range(1, bands+1)), window=rasterio.windows.Window(x, y, h, w))
+def get_tiff_block(ds, x, y, w, h=None, bands=3):
+    if h is None: h = w
+    return ds.read(list(range(1, bands+1)), window=rasterio.windows.Window(x, y, w, h))
 
 def save_tiff_uint8_single_band(img, path):
     assert img.dtype == np.uint8

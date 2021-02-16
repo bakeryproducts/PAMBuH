@@ -63,15 +63,14 @@ class TagSegmentDataset:
         self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
         self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
         self.mode_train = mode_train
-        img_domains = {'0486052bb': 1,
-                     '095bf7a1f': 0,
-                     '1e2425f28': 0,
-                     '2f6ecfcdf': 1,
-                     '54f2eec69': 0,
-                     'aaa6a05cc': 1,
-                     'cb2d976f4': 1,
-                     'e79de561c': 0}
-                    }
+        img_domains = {  '0486052bb': 1,
+                         '095bf7a1f': 0,
+                         '1e2425f28': 0,
+                         '2f6ecfcdf': 1,
+                         '54f2eec69': 0,
+                         'aaa6a05cc': 1,
+                         'cb2d976f4': 1,
+                         'e79de561c': 0}
         
         dss = []
         for imgf, maskf in zip(self.img_folders, self.masks_folders):
@@ -88,7 +87,7 @@ class TagSegmentDataset:
     def __getitem__(self, idx): return self.dataset[idx]
     def _view(self, idx):
         img, (mask, cl_id) = self.__getitem__(idx)
-        return Image.blend(img,mask,.5)
+        return Image.blend(img, mask,.5)
     
 
 def init_datasets(cfg):
@@ -112,6 +111,10 @@ def init_datasets(cfg):
         "train1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
         "val1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/val/imgs', DATA_DIR/'SPLITS/split1024x25_gray/val/masks'),
         "backs_30_x25_1024gray": SegmentDataset(DATA_DIR/'backs030_x25_gray/imgs', DATA_DIR/'backs030_x25_gray/masks'),
+
+        "train1024x25grayTTT": TagSegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
+        "val1024x25grayTTT": TagSegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/val/imgs', DATA_DIR/'SPLITS/split1024x25_gray/val/masks'),
+        "backs_30_x25_1024grayTTT": TagSegmentDataset(DATA_DIR/'backs030_x25_gray/imgs', DATA_DIR/'backs030_x25_gray/masks'),
     }
     return  DATASETS
 
@@ -151,6 +154,11 @@ def build_datasets(cfg, mode_train=True, num_proc=4):
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
+    #tag_transform_factory = {
+    #        'TRAIN':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
+    #        'VALID':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
+    #        'TEST':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
+    #    }
 
     extend_factories = {
              'PRELOAD':partial(PreloadingDataset, num_proc=num_proc, progress=tqdm),

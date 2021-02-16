@@ -40,6 +40,9 @@ class ImageDataset(Dataset):
         return img
     
 class TagImageDataset(Dataset):
+    """
+        Returns tuple (mask, class_idx) 
+    """
     def __init__(self, root, pattern, tags):
         super(ImageTagDataset, self).__init__(root, pattern)
         self.tags= tags
@@ -117,7 +120,7 @@ class TransformTagDataset:
         self.transforms = albu.Compose([]) if transforms is None else transforms
     
     def __getitem__(self, idx):
-        img, mask, cl_id = self.dataset.__getitem__(idx)
+        img, (mask, cl_id) = self.dataset.__getitem__(idx)
         augmented = self.transforms(image=img, mask=mask)
         amask = augmented["mask"][0]# as binary
         amask = amask.view(1,*amask.shape)

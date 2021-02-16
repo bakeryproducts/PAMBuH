@@ -104,7 +104,7 @@ def postprocess_test_folder(infer_func, src_folder : str, dst_folder : str, thre
         spamwriter = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
         spamwriter.writerow(['id', 'predicted'])
         for img_name in tqdm(imgs_name, desc='Test images', leave=False):
-            mask = read_and_process_img(img_name, infer_func)
+            mask = read_and_process_img(img_name, infer_func, threshold=threshold)
             if save_predicts:
                 utils.save_tiff_uint8_single_band(mask, dst_folder / img_name.name)
             if join_predicts:

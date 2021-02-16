@@ -41,7 +41,7 @@ class Augmentator:
             ], p=1)    
 
     def crop_scale(self):
-        return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.2,1))
+        return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.3,.7))
 
     
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)

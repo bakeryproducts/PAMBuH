@@ -39,6 +39,16 @@ class ImageDataset(Dataset):
         img = Image.open(str(img_path))
         return img
     
+class TagImageDataset(Dataset):
+    def __init__(self, root, pattern, tags):
+        super(ImageTagDataset, self).__init__(root, pattern)
+        self.tags= tags
+
+    def load_item(self, idx):
+        img_path = self.files[idx]
+        img = Image.open(str(img_path))
+        return img, self.tags[img_path.parent.name]
+    
 class PairDataset:
     def __init__(self, ds1, ds2):
         self.ds1, self.ds2 = ds1, ds2
@@ -98,6 +108,21 @@ class TransformDataset:
         amask = amask.view(1,*amask.shape)
 
         return augmented["image"], amask
+    
+    def __len__(self): return len(self.dataset)
+
+class TransformTagDataset:
+    def __init__(self, dataset, transforms):
+        self.dataset = dataset
+        self.transforms = albu.Compose([]) if transforms is None else transforms
+    
+    def __getitem__(self, idx):
+        img, mask, cl_id = self.dataset.__getitem__(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        amask = augmented["mask"][0]# as binary
+        amask = amask.view(1,*amask.shape)
+
+        return augmented["image"], amask, cl_id
     
     def __len__(self): return len(self.dataset)
 
@@ -176,6 +201,11 @@ def expander(x):
 def expander_float(x):
     x = np.array(x).astype(np.float32) / 255.
     return x if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=-1), 3, -1)
+
+def expander_float_item(item):
+    x, cl_id = item
+    x = np.array(x).astype(np.float32) / 255.
+    return x, cl_id if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=-1), 3, -1), cl_id
 
 def update_mean_std(cfg, mean, std):
     was_frozen: False

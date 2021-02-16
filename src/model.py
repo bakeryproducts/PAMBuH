@@ -173,7 +173,7 @@ class att_unet(_base_unet):
     
     def forward(self, x):
         e1,e2,e3,e4,bottleneck = self.forward_encoding(x)
-        
+         
         d4 = self.upsample4(bottleneck) 
         ea4 = self.ag4(d4, e4)
         d4 = self.d4(self.cat(d4,ea4))
@@ -236,6 +236,55 @@ class Unet_x025(_base_unet):
         e21 = self.e21(self.downsample21(x))
         e22 = self.e22(self.downsample22(e21))
         return self.conv_1x1(e22)
+
+
+class Domain_class(nn.Module):
+    def __init__(self, in_channels=16*32):
+        super(_base_enc_unet, self).__init__()
+        self.init_features = in_channels 
+        #self.l1 = torch.
+
+    def forward(self, x):
+        x = (2*x).detach() - x
+        x = self.l1(x)
+        x = self.l2(x)
+        return x
+
+class domain_unet(_base_enc_unet):
+    def __init__(self, *args, **kwargs):
+        super(_base_unet, self).__init__( *args, **kwargs)
+        f = self.init_features
+        
+        self.upsample4 = nn.ConvTranspose2d(f*16, f*8, kernel_size=2, stride=2)
+        self.d4 =  conv_block(16*f, 8*f, 'd4')
+        self.upsample3 = nn.ConvTranspose2d(f*8, f*4, kernel_size=2, stride=2)
+        self.d3 =  conv_block(8*f, 4*f, 'd3')
+        self.upsample2 = nn.ConvTranspose2d(f*4, f*2, kernel_size=2, stride=2)
+        self.d2 =  conv_block(4*f, 2*f, 'd2')
+        self.upsample1 = nn.ConvTranspose2d(f*2, f, kernel_size=2, stride=2)
+        self.d1 =  conv_block(2*f, f, 'd1')
+
+        self.cl_head = self.Domain_class(f*32)
+
+    def forward(self, x):
+        e1,e2,e3,e4,bottleneck = self.forward_encoding(x)
+        y = self.class_head(bottleneck)
+        
+        # decoding + concat path
+        d4 = self.upsample4(bottleneck) 
+        d4 = self.d4(self.cat(d4,e4))
+        
+        d3 = self.upsample3(d4)
+        d3 = self.d3(self.cat(d3,e3))
+        
+        d2 = self.upsample2(d3) 
+        d2 = self.d2(self.cat(d2,e2))
+        
+        d1 = self.upsample1(d2)
+        d1 = self.d1(self.cat(d1,e1))
+        return d1,  y
+
+
 
 def to_cuda(models): return [model.cuda() for model in models]
 def scale_lr(lr, cfg): return lr * float(cfg.TRAIN.BATCH_SIZE * cfg.PARALLEL.WORLD_SIZE)/256.

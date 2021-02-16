@@ -21,7 +21,6 @@ from sampler import GdalSampler
 from _data import *
 #from _data import ImageDataset, PairDataset, ConcatDataset, expander, expander_float, mean_std_dataset, create_transforms, TransformDataset, update_mean_std
 
-
 class SegmentDataset:
     '''
     mode_train False  is for viewing imgs in ipunb
@@ -47,7 +46,6 @@ class SegmentDataset:
             ids = ImageDataset(imgf, '*.png')
             mds = ImageDataset(maskf, '*.png')
             if self.mode_train:
-                # TODO CHANGE THIS BACK to expander, AUG DATASETS
                 ids.process_item = expander
                 mds.process_item = expander_float
             dss.append(PairDataset(ids, mds))
@@ -59,6 +57,38 @@ class SegmentDataset:
     def _view(self, idx):
         pair = self.__getitem__(idx)
         return Image.blend(*pair,.5)
+
+class TagSegmentDataset:
+    def __init__(self, imgs_path, masks_path, mode_train=True):
+        self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
+        self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
+        self.mode_train = mode_train
+        img_domains = {'0486052bb': 1,
+                     '095bf7a1f': 0,
+                     '1e2425f28': 0,
+                     '2f6ecfcdf': 1,
+                     '54f2eec69': 0,
+                     'aaa6a05cc': 1,
+                     'cb2d976f4': 1,
+                     'e79de561c': 0}
+                    }
+        
+        dss = []
+        for imgf, maskf in zip(self.img_folders, self.masks_folders):
+            ids = ImageDataset(imgf, '*.png')
+            mds = TagImageDataset(maskf, '*.png', tags=img_domains)
+            if self.mode_train:
+                ids.process_item = expander
+                mds.process_item = expander_float_item
+            dss.append(PairDataset(ids, mds))
+        
+        self.dataset = ConcatDataset(dss)
+    
+    def __len__(self): return len(self.dataset)
+    def __getitem__(self, idx): return self.dataset[idx]
+    def _view(self, idx):
+        img, (mask, cl_id) = self.__getitem__(idx)
+        return Image.blend(img,mask,.5)
     
 
 def init_datasets(cfg):
@@ -71,13 +101,17 @@ def init_datasets(cfg):
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     
     DATASETS = {
-        "cuts512": SegmentDataset(DATA_DIR/'cuts512/imgs', DATA_DIR/'cuts512/masks'),
-        "train512": SegmentDataset(DATA_DIR/'split512_1/train/imgs', DATA_DIR/'split512_1/train/masks'),
-        "val512": SegmentDataset(DATA_DIR/'split512_1/val/imgs', DATA_DIR/'split512_1/val/masks'),
-
-        "train1024x05": SegmentDataset(DATA_DIR/'split1024x05/train/imgs', DATA_DIR/'split1024x05/train/masks'),
-        "val1024x05": SegmentDataset(DATA_DIR/'split1024x05/val/imgs', DATA_DIR/'split1024x05/val/masks'),
+        "train1024x05": SegmentDataset(DATA_DIR/'SPLITS/split1024x05/train/imgs', DATA_DIR/'SPLITS/split1024x05/train/masks'),
+        "val1024x05": SegmentDataset(DATA_DIR/'SPLITS/split1024x05/val/imgs', DATA_DIR/'SPLITS/split1024x05/val/masks'),
         "backs_30_1024": SegmentDataset(DATA_DIR/'backs030/imgs', DATA_DIR/'backs030/masks'),
+
+        "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
+        "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
+        "backs_30_x25_1024": SegmentDataset(DATA_DIR/'backs030_x25/imgs', DATA_DIR/'backs030_x25/masks'),
+
+        "train1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
+        "val1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/val/imgs', DATA_DIR/'SPLITS/split1024x25_gray/val/masks'),
+        "backs_30_x25_1024gray": SegmentDataset(DATA_DIR/'backs030_x25_gray/imgs', DATA_DIR/'backs030_x25_gray/masks'),
     }
     return  DATASETS
 
@@ -89,7 +123,6 @@ def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST'])
         if datasets_strings:
             datasets = [all_datasets[ds] for ds in datasets_strings]
             ds = TorchConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
-            #ds = datasets[0]
             converted_datasets[dataset_type] = ds
     return converted_datasets
 

@@ -44,7 +44,7 @@ class TagImageDataset(Dataset):
         Returns tuple (mask, class_idx) 
     """
     def __init__(self, root, pattern, tags):
-        super(ImageTagDataset, self).__init__(root, pattern)
+        super(TagImageDataset, self).__init__(root, pattern)
         self.tags= tags
 
     def load_item(self, idx):

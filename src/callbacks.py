@@ -22,7 +22,7 @@ def denorm(images, mean=(0.46454108, 0.43718538, 0.39618185), std=(0.23577851, 0
 
 class CudaCB(sh.callbacks.Callback):
     def before_batch(self):
-        xb,yb = self.batch
+        xb, yb = self.batch
         if self.model.training: yb = yb.cuda()
         self.learner.batch = xb.cuda(), yb
 

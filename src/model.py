@@ -238,16 +238,18 @@ class Unet_x025(_base_unet):
         return self.conv_1x1(e22)
 
 
-class Domain_class(nn.Module):
+class domain_head(nn.Module):
     def __init__(self, in_channels=16*32):
         super(_base_enc_unet, self).__init__()
-        self.init_features = in_channels 
-        #self.l1 = torch.
+        f = in_channels 
+        self.fc1 = torch.nn.Linear(f, 64)
+        self.fc2 = torch.nn.Linear(64, 1)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = (2*x).detach() - x
-        x = self.l1(x)
-        x = self.l2(x)
+        x = self.fc1(self.relu(x))
+        x = self.fc2(self.relu(x))
         return x
 
 class domain_unet(_base_enc_unet):
@@ -264,11 +266,14 @@ class domain_unet(_base_enc_unet):
         self.upsample1 = nn.ConvTranspose2d(f*2, f, kernel_size=2, stride=2)
         self.d1 =  conv_block(2*f, f, 'd1')
 
-        self.cl_head = self.Domain_class(f*32)
+        self.dhead = self.domain_head(f*32) # 32 for encoder deepest level
+        self.conv_1x1 = nn.Conv2d(self.init_features, self.out_channels, kernel_size=1,stride=1,padding=0)
+
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
 
     def forward(self, x):
         e1,e2,e3,e4,bottleneck = self.forward_encoding(x)
-        y = self.class_head(bottleneck)
+        domain = self.dhead(bottleneck)
         
         # decoding + concat path
         d4 = self.upsample4(bottleneck) 
@@ -282,7 +287,8 @@ class domain_unet(_base_enc_unet):
         
         d1 = self.upsample1(d2)
         d1 = self.d1(self.cat(d1,e1))
-        return d1,  y
+
+        return self.conv_1x1(d1),  domain
 
 
 

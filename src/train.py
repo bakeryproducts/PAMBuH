@@ -21,8 +21,8 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     dls = build_dataloaders(cfg, datasets, pin=True, drop_last=False)
     model, opt = build_model(cfg)
 
-    #criterion = torch.nn.BCEWithLogitsLoss()
-    criterion = partial(focal_loss,  gamma=2)# from callbacks
+    criterion = torch.nn.BCEWithLogitsLoss()
+    #criterion = partial(focal_loss,  gamma=2)# from callbacks
     
     logger.log("DEBUG", 'INIT CALLBACKS') 
     train_cb = TrainCB(logger=logger, use_cuda=use_cuda)

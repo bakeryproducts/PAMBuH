@@ -9,6 +9,30 @@ import torch
 import torch.nn.functional as F
 import albumentations as albu
 
+import augs
+
+class CfgParse:
+    def __init__(self, cfg_file):
+        self.compose = albu.Compose
+        data = self.parse_yaml(cfg_file)
+        self.mean = data['TRANSFORMERS']['MEAN']
+        self.std = data['TRANSFORMERS']['STD']        
+        self.scale = self.get_scale(data)
+        assert self.scale is not None
+
+    def get_scale(self, data):
+        return  data['TRAIN'].get('DOWNSCALE', None)
+
+    def parse_yaml(self, cfg_file):
+        with open(cfg_file, 'r') as stream:
+            try:
+                data = yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                print(exc)
+        return data
+
+    def norm(self): 
+        return self.compose([albu.Normalize(mean=self.mean, std=self.std), augs.ToTensor()])
 
 def parse_model_path(p):
     name = str(p.name)
@@ -21,33 +45,28 @@ def get_last_model(src):
     res = []
     for i, m in enumerate(models):
         epoch = parse_model_path(m)
-        #print(m, epoch)
-        
         res.append([i,epoch])
     idx = sorted(res, key=lambda x: -x[1])[0][0]
     return models[idx]
 
 def rescale(batch_img, scale): return F.interpolate(batch_img, scale_factor=(scale, scale))
 
-def preprocess_image(img, transform):
-    # TODO scaling param
-    DOWNSCALE = 4
+def preprocess_image(img, scale, transform):
     ch, H,W, dtype = *img.shape, img.dtype
     assert ch==3 and dtype==np.uint8
     img = img.transpose(1,2,0)
 
-    img = cv2.resize(img, (W // DOWNSCALE, H // DOWNSCALE))
+    img = cv2.resize(img, (W // scale, H // scale))
     return transform(image=img)['image']
 
-def _infer_func(imgs, transform, model):
-    batch = [preprocess_image(i, transform) for i in imgs]
+def _infer_func(imgs, transform, scale, model):
+    batch = [preprocess_image(i, scale, transform) for i in imgs]
     batch = torch.stack(batch,axis=0).cuda()
     #print(batch.shape, batch.dtype)
     with torch.no_grad():
         res = torch.sigmoid(model(batch))
 
-    UPSCALE = 4
-    res = rescale(res, UPSCALE)
+    res = rescale(res, scale)
     return res
     
 def get_infer_func(root):
@@ -62,24 +81,13 @@ def get_infer_func(root):
     spec.loader.exec_module(nn_model)
 
     root = Path(root)
-    #sys.path.append(str(root) + 'src')
-    import augs
-    #import model as nn_model
-    from config import cfg, cfg_init
-
-    cfg_init(str(root / 'cfg.yaml'))
-    cfg['PARALLEL']['DDP'] = False
-    cfg['DATA']['TRAIN']['PRELOAD'] = False
-
-    train_trans = augs.get_aug('light', cfg.TRANSFORMERS)
-    transform = train_trans.transforms.transforms[-1] # norm and chw
+    cfg_data = CfgParse(root/'cfg.yaml')
+    transform = cfg_data.norm() 
 
     model_path = get_last_model(root / 'models')
-    model = nn_model.load_model(cfg, str(model_path))
+    model = nn_model.load_model(_, str(model_path))
     model = model.cuda()
 
-    return partial(_infer_func, transform=transform, model=model)
-
-
+    return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 
 

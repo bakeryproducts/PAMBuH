@@ -35,14 +35,27 @@ class Augmentator:
     
     def rand_crop(self):
         return albu.OneOf([
-                #albu.RandomResizedCrop(h,w, scale=(0.05, 0.4)), 
                 albu.RandomCrop(self.crop_h,self.crop_w)
-                #albu.CropNonEmptyMaskIfExists(h,w)
             ], p=1)    
 
     def crop_scale(self):
         return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.3,.7))
 
+    def multi_crop(self):
+        return albu.OneOf([
+                albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.3, .7), p=.7), 
+                albu.CenterCrop(self.crop_h,self.crop_w, p=.3)
+            ], p=1)    
+
+    def color_jit(self):
+        return albu.OneOf([
+                    albu.HueSaturationValue(10,15,10),
+                    albu.CLAHE(clip_limit=4),
+                    albu.RandomBrightnessContrast(),
+                    albu.ColorJitter(brightness=0.07, contrast=0.07, saturation=0.1, hue=0.1)
+                ], p=0.2)
+
+    def blur(self): return albu.GaussianBlur(p=.1)
     
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
 
@@ -50,7 +63,7 @@ class Augmentator:
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
 
-    def aug_light_scale(self): return self.compose([self.crop_scale(), albu.Flip(), albu.RandomRotate90(), self.norm()])
+    def aug_light_scale(self): return self.compose([self.multi_crop(), albu.Flip(), albu.RandomRotate90(), self.color_jit(), self.blur(), self.norm()])
 
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])

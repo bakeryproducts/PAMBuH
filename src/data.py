@@ -86,7 +86,7 @@ class TagSegmentDataset:
     def __len__(self): return len(self.dataset)
     def __getitem__(self, idx): return self.dataset[idx]
     def _view(self, idx):
-        img, (mask, cl_id) = self.__getitem__(idx)
+        img, mask, cl_id = self.__getitem__(idx)
         return Image.blend(img, mask,.5)
     
 

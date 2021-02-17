@@ -165,11 +165,12 @@ if __name__ == '__main__':
 
     #model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
     #model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
-    model_folder = 'output/2021_Feb_15_15_06_52_PAMBUH/'
-    
+    #model_folder = 'output/2021_Feb_15_15_06_52_PAMBUH/'
+    model_folder = 'output/2021_Feb_16_22_42_16_PAMBUH/'
+
     block_size = 2048
     pad = 0
-    threshold = 200
+    threshold = 120
     save_predicts = True
     join_predicts = True
 

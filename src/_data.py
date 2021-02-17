@@ -208,7 +208,7 @@ def expander_float(x):
 def expander_float_item(item):
     x, cl_id = item
     x = np.array(x).astype(np.float32) / 255.
-    return x, cl_id if len(x.shape) == 3 else np.repeat(np.expand_dims(x, axis=-1), 3, -1), cl_id
+    return (x, cl_id) if len(x.shape) == 3 else (np.repeat(np.expand_dims(x, axis=-1), 3, -1), cl_id)
 
 def update_mean_std(cfg, mean, std):
     was_frozen: False

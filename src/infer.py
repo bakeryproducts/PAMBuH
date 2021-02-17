@@ -31,7 +31,7 @@ def rescale(batch_img, scale): return F.interpolate(batch_img, scale_factor=(sca
 
 def preprocess_image(img, transform):
     # TODO scaling param
-    DOWNSCALE = 2
+    DOWNSCALE = 4
     ch, H,W, dtype = *img.shape, img.dtype
     assert ch==3 and dtype==np.uint8
     img = img.transpose(1,2,0)
@@ -46,7 +46,7 @@ def _infer_func(imgs, transform, model):
     with torch.no_grad():
         res = torch.sigmoid(model(batch))
 
-    UPSCALE = 2
+    UPSCALE = 4
     res = rescale(res, UPSCALE)
     return res
     

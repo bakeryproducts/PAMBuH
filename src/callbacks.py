@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import shallow as sh
 import utils
 from logger import logger
+import loss
 
 
 def upscale(tensor, size): return torch.nn.functional.interpolate(tensor, size=size)
@@ -33,8 +34,7 @@ class CudaCB(sh.callbacks.Callback):
         xb, yb = get_xb_yb(self.batch)
         tag = get_tag(self.batch)
 
-        if self.model.training: yb = yb.cuda()
-
+        yb = yb.cuda()
         labels = yb if not tag else (yb, tag)
         self.learner.batch = xb.cuda(), labels
 
@@ -53,7 +53,7 @@ class TrackResultsCB(sh.callbacks.Callback):
         tag = get_tag(self.batch)
         batch_size = xb.shape[0]
         #print(self.preds.shape, yb.shape, xb.shape)
-        dice = dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+        dice = loss.dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
         #print(n, dice, dice*n)
         self.accs.append(dice * batch_size)
         self.samples_count.append(batch_size)
@@ -181,7 +181,7 @@ class ValCB(sh.callbacks.Callback):
             tag = get_tag(batch)
             batch_size = xb.shape[0]
             #print(self.preds.shape, yb.shape, xb.shape)
-            dice = dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+            dice = loss.dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
             self.accs.append(dice * batch_size)
             self.samples_count.append(batch_size)
@@ -193,6 +193,5 @@ class ValCB(sh.callbacks.Callback):
             xb, yb = self.batch
             self.learner.preds = self.model(xb)
             self.learner.loss = self.loss_func(self.preds, yb)
-
 
 

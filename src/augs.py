@@ -40,7 +40,7 @@ class Augmentator:
 
     def multi_crop(self):
         return albu.OneOf([
-                albu.RandomCrop(self.crop_h,self.crop_w, p=.3)
+                albu.RandomCrop(self.crop_h,self.crop_w, p=.3),
                 #albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.3, .7), p=.7), 
                 albu.CenterCrop(self.crop_h,self.crop_w, p=.7)
             ], p=1)    

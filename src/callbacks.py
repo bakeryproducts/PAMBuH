@@ -20,11 +20,23 @@ def denorm(images, mean=(0.46454108, 0.43718538, 0.39618185), std=(0.23577851, 0
     images = images * std + mean
     return images
 
+def get_xb_yb(b):
+    if isinstance(b[1], tuple): return b[0], b[1][0]
+    else: return b
+
+def get_tag(b):
+    if isinstance(b[1], tuple): return b[1][1]
+    else: return None
+
 class CudaCB(sh.callbacks.Callback):
     def before_batch(self):
-        xb, yb = self.batch
+        xb, yb = get_xb_yb(self.batch)
+        tag = get_tag(self.batch)
+
         if self.model.training: yb = yb.cuda()
-        self.learner.batch = xb.cuda(), yb
+
+        labels = yb if not tag else (yb, tag)
+        self.learner.batch = xb.cuda(), labels
 
     def before_fit(self): self.model.cuda()
 
@@ -37,15 +49,15 @@ class TrackResultsCB(sh.callbacks.Callback):
         print(self.n_epoch, self.model.training, sum(self.losses)/n, sum(self.accs)/n)
         
     def after_batch(self):
-        xb, yb = self.batch
-        n = xb.shape[0]
+        xb, yb = get_xb_yb(self.batch)
+        tag = get_tag(self.batch)
+        batch_size = xb.shape[0]
         #print(self.preds.shape, yb.shape, xb.shape)
         dice = dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
         #print(n, dice, dice*n)
-        self.accs.append(dice*n)
-        self.samples_count.append(n)
-        if self.model.training:
-            self.losses.append(self.loss.detach().item()*n)
+        self.accs.append(dice * batch_size)
+        self.samples_count.append(batch_size)
+        self.losses.append(self.loss.detach().item()*batch_size)
 
 
 class TBMetricCB(TrackResultsCB):
@@ -88,7 +100,7 @@ class TBPredictionsCB(sh.callbacks.Callback):
         self.count, self.wh = 5, (256, 256)
 
     def process_batch(self):
-        xb, yb = self.batch
+        xb, yb = get_xb_yb(self.batch)
         preds = self.preds
         num_channels = 1
         mean, std = self.kwargs['cfg'].TRANSFORMERS.MEAN, self.kwargs['cfg'].TRANSFORMERS.STD 
@@ -122,7 +134,6 @@ class TBPredictionsCB(sh.callbacks.Callback):
             self.process_write_predictions()
 
 
-
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None, use_cuda=True): 
         sh.utils.store_attr(self, locals())
@@ -136,7 +147,8 @@ class TrainCB(sh.callbacks.Callback):
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
             
-        xb,yb = self.batch
+        xb, yb = self.batch
+
         if self.kwargs['cfg'].TRAIN.AMP:
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
@@ -159,26 +171,28 @@ class ValCB(sh.callbacks.Callback):
  
     @sh.utils.on_validation
     def before_epoch(self):
-        self.lucky_numbers = np.random.choice(list(range(len(self.dl))), 3)
-        #self.log_debug(f'Indexies for val eval plots:{self.lucky_numbers}')
-        self.evals = []
+        #self.run_extra_valid()
         self.learner.metrics = []
 
-    def evaluate(self, xb, yb, preds):
-        # all of them are in batch dim
-        if self.n_batch in self.lucky_numbers:
-            pass
-        return metric
-                
+    def run_extra_valid(self):
+        for batch in self.extra_valid_dl:
+            xb, yb = get_xb_yb(batch)
+            preds = self.model(xb)
+            tag = get_tag(batch)
+            batch_size = xb.shape[0]
+            #print(self.preds.shape, yb.shape, xb.shape)
+            dice = dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+            #print(n, dice, dice*n)
+            self.accs.append(dice * batch_size)
+            self.samples_count.append(batch_size)
+            self.losses.append(self.loss.detach().item()*batch_size)
+
     @sh.utils.on_master
     def val_step(self):
         with torch.no_grad():
-            #self.log_debug('VALSTEP')
             xb, yb = self.batch
             self.learner.preds = self.model(xb)
-            #metric = self.evaluate(xb, yb, preds)
-
-
+            self.learner.loss = self.loss_func(self.preds, yb)
 
 
 

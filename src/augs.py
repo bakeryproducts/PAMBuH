@@ -49,9 +49,9 @@ class Augmentator:
         return albu.OneOf([
                     albu.HueSaturationValue(10,15,10),
                     albu.CLAHE(clip_limit=4),
-                    albu.RandomBrightnessContrast(),
-                    albu.ColorJitter(brightness=0.07, contrast=0.07, saturation=0.1, hue=0.1)
-                ], p=0.2)
+                    #albu.RandomBrightnessContrast(),
+                    albu.ColorJitter(brightness=0.2, contrast=0.07, saturation=0.1, hue=0.1)
+                ], p=0.4)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])

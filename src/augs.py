@@ -34,9 +34,9 @@ class Augmentator:
     def norm(self): return self.compose([albu.Normalize(mean=self.mean, std=self.std), ToTensor()])
     def rand_crop(self): albu.RandomCrop(self.crop_h,self.crop_w)
     def crop_scale(self): return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.3,.7))
-    def blur(self): return albu.GaussianBlur(p=.1)
-    def scale(self): return albu.ShiftScaleRotate(0.0625,0.1,45)
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
+    def blur(self): return albu.GaussianBlur(p=.1)
+    def scale(self): return albu.ShiftScaleRotate(0.0625,0.1,45, p=.5)
 
     def multi_crop(self):
         return albu.OneOf([
@@ -51,7 +51,7 @@ class Augmentator:
                     albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(),
                     albu.ColorJitter(brightness=0.2, contrast=0.07, saturation=0.1, hue=0.1)
-                ], p=0.4)
+                ], p=0.2)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_light(self): return self.compose([self.rand_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])

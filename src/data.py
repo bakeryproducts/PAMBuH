@@ -106,6 +106,7 @@ def init_datasets(cfg):
 
         "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
         "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
+        "val2_1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val2/imgs', DATA_DIR/'SPLITS/split1024x25/val2/masks'),
         "backs_30_x25_1024": SegmentDataset(DATA_DIR/'backs030_x25/imgs', DATA_DIR/'backs030_x25/masks'),
 
         "train1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
@@ -118,7 +119,7 @@ def init_datasets(cfg):
     }
     return  DATASETS
 
-def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST']):
+def create_datasets(cfg, all_datasets, dataset_types):
     converted_datasets = {}
     for dataset_type in dataset_types:
         data_field = cfg.DATA[dataset_type]
@@ -129,7 +130,7 @@ def create_datasets(cfg, all_datasets, dataset_types=['TRAIN', 'VALID', 'TEST'])
             converted_datasets[dataset_type] = ds
     return converted_datasets
 
-def build_datasets(cfg, mode_train=True, num_proc=4):
+def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VALID', 'TEST']):
     """
         Creates dictionary :
         {
@@ -152,6 +153,7 @@ def build_datasets(cfg, mode_train=True, num_proc=4):
     transform_factory = {
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
+            'VALID2':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
     #tag_transform_factory = {
@@ -165,13 +167,13 @@ def build_datasets(cfg, mode_train=True, num_proc=4):
              'MULTIPLY':MultiplyDataset,
     }
  
-    datasets = create_datasets(cfg, init_datasets(cfg))
+    datasets = create_datasets(cfg, init_datasets(cfg), dataset_types)
     mean, std = mean_std_dataset(datasets['TRAIN'])
     if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
         update_mean_std(cfg, mean, std)
 
     datasets = create_extensions(cfg, datasets, extend_factories)
-    transforms = create_transforms(cfg, transform_factory)
+    transforms = create_transforms(cfg, transform_factory, dataset_types)
     datasets = apply_transforms_datasets(datasets, transforms)
     return datasets
 
@@ -200,9 +202,11 @@ def build_dataloaders(cfg, datasets, samplers=None, drop_last=False, pin=False):
     '''
     dls = {}
     batch_sizes = {'TRAIN': cfg.TRAIN.BATCH_SIZE,
-                    'VALID': cfg.VALID.BATCH_SIZE}
+                    'VALID': cfg.VALID.BATCH_SIZE,
+                    'VALID2': cfg.VALID.BATCH_SIZE
+                    }
 
-    samplers = {'TRAIN':None, 'VALID':None}
+    samplers = {'TRAIN':None, 'VALID':None, 'VALID2':None}
     num_workers = cfg.TRAIN.NUM_WORKERS
     for kind, dataset in datasets.items():
         if cfg.PARALLEL.DDP and kind == 'TRAIN':

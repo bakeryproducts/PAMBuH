@@ -41,6 +41,9 @@ class CudaCB(sh.callbacks.Callback):
     def before_fit(self): self.model.cuda()
 
 class TrackResultsCB(sh.callbacks.Callback):
+    """
+        TODO break alliance with TB metric CB
+    """
     def before_epoch(self): 
         self.accs,self.losses,self.samples_count = [],[],[]
         
@@ -85,13 +88,21 @@ class TBMetricCB(TrackResultsCB):
         
     def after_epoch_valid(self):
         #self.log_debug('tb metric after validation')
+        self.val_loss = sum(self.losses) / sum(self.samples_count)
         self.valid_dice =  sum(self.accs) / sum(self.samples_count)
+        self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
     def after_epoch(self):
         if self.model.training: self.after_epoch_train()
         else: self.after_epoch_valid()
         self.writer.flush()
+
+    def before_epoch(self):
+        self.accs,self.losses,self.samples_count = [],[],[]
+        #self.learner.extra_accs, self.learner.extra_samples_count = [], []
+
+
 
         
 class TBPredictionsCB(sh.callbacks.Callback):
@@ -135,7 +146,7 @@ class TBPredictionsCB(sh.callbacks.Callback):
 
 
 class TrainCB(sh.callbacks.Callback):
-    def __init__(self, logger=None, use_cuda=True): 
+    def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
         self.scaler = torch.cuda.amp.GradScaler() 
     
@@ -165,27 +176,30 @@ class TrainCB(sh.callbacks.Callback):
         self.learner.opt.zero_grad()
 
 class ValCB(sh.callbacks.Callback):
-    def __init__(self, logger=None):
+    def __init__(self, dl=None, logger=None):
+        self.extra_valid_dl = dl
         sh.utils.store_attr(self, locals())
         self.evals = []
  
     @sh.utils.on_validation
     def before_epoch(self):
-        #self.run_extra_valid()
+        if self.extra_valid_dl is not None:
+            self.run_extra_valid()
         self.learner.metrics = []
 
     def run_extra_valid(self):
+        self.learner.extra_accs, self.learner.extra_samples_count = [], []
         for batch in self.extra_valid_dl:
             xb, yb = get_xb_yb(batch)
-            preds = self.model(xb)
+            preds = self.model(xb.cuda())
             tag = get_tag(batch)
             batch_size = xb.shape[0]
-            #print(self.preds.shape, yb.shape, xb.shape)
-            dice = loss.dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+            #print(preds.shape, yb.shape, xb.shape)
+            dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
-            self.accs.append(dice * batch_size)
-            self.samples_count.append(batch_size)
-            self.losses.append(self.loss.detach().item()*batch_size)
+            self.learner.extra_accs.append(dice * batch_size)
+            self.learner.extra_samples_count.append(batch_size)
+            #self.learner.losses.append(self.loss.detach().item()*batch_size)
 
     @sh.utils.on_master
     def val_step(self):

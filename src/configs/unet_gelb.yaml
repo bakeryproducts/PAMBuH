@@ -11,6 +11,9 @@ DATA:
   VALID:
     DATASETS: ['val1024x25']
     PRELOAD: False
+  VALID2:
+    DATASETS: ['val2_1024x25']
+    PRELOAD: False
   TEST:
     DATASETS: []
 
@@ -18,6 +21,8 @@ TRANSFORMERS:
   TRAIN:
     AUG: 'light_scale'
   VALID:
+    AUG: 'val'
+  VALID2:
     AUG: 'val'
   TEST:
     AUG: 'test'
@@ -30,12 +35,12 @@ TRAIN:
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
-  SAVE_STEP: .1
+  SAVE_STEP: .2
   SCALAR_STEP: 1
   TB_STEP: 5
   
   EPOCH_COUNT: 500
-  BATCH_SIZE: 64
+  BATCH_SIZE: 32
 VALID:
   STEP: 5
   BATCH_SIZE: 32

@@ -48,43 +48,6 @@ class TrackResultsCB(sh.callbacks.Callback):
             self.losses.append(self.loss.detach().item()*n)
 
 
-def dice_loss(inp, target, eps=1e-6):
-    with torch.no_grad():
-        a = inp.contiguous().view(-1)
-        b = target.contiguous().view(-1)
-        intersection = (a * b).sum()
-        dice = ((2. * intersection + eps) / (a.sum() + b.sum() + eps)) 
-        return dice.item()
-
-def focal_loss(outputs: torch.Tensor, targets: torch.Tensor, gamma: float = 2.0, alpha: float = 0.25, reduction: str = "mean"):
-    """
-    Compute binary focal loss between target and output logits.
-
-    Args:
-        reduction (string, optional):
-            none | mean | sum | batchwise_mean
-            none: no reduction will be applied,
-            mean: the sum of the output will be divided by the number of elements in the output,
-            sum: the output will be summed.
-    Returns:
-        computed loss
-
-    Source: https://github.com/BloodAxe/pytorch-toolbelt, Catalyst
-    """
-    targets = targets.type(outputs.type())
-    logpt = -torch.nn.functional.binary_cross_entropy_with_logits(outputs, targets, reduction="none")
-    pt = torch.exp(logpt)
-    # compute the loss
-    loss = -((1 - pt).pow(gamma)) * logpt
-    #if alpha is not None: loss = loss * (alpha * targets + (1 - alpha) * (1 - targets))
-
-    if reduction == "mean": loss = loss.mean()
-    if reduction == "sum": loss = loss.sum()
-    if reduction == "batchwise_mean": loss = loss.sum(0)
-
-    return loss
-
-
 class TBMetricCB(TrackResultsCB):
     def __init__(self, writer, train_metrics=None, validation_metrics=None, logger=None):
         ''' train_metrics = {'losses':['train_loss', 'val_loss']}

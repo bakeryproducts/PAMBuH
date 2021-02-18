@@ -54,13 +54,9 @@ _____________
     find worst test image
 6. COde based:
     - Docker
-    - Focal loss
     - TTA
-    - ShiftScaleRotate
     - do padding in postp
-    - weight decay
-    - tencent 
-    - backgrounds
+    - 
     - 
 
 

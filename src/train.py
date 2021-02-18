@@ -14,6 +14,12 @@ from model import build_model
 
 from callbacks import *
 
+def clo(logits, predicts):
+    w1 = .8
+    w2 = 1 - w1 
+    l1 = loss.lovasz_hinge(logits, predicts) 
+    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts)
+    return l1*w1 + l2*w2
 
 
 def start(cfg, output_folder, n_epochs, use_cuda=True):
@@ -21,8 +27,9 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     dls = build_dataloaders(cfg, datasets, pin=True, drop_last=False)
     model, opt = build_model(cfg)
 
-    criterion = torch.nn.BCEWithLogitsLoss()
+    #criterion = torch.nn.BCEWithLogitsLoss()
     #criterion = partial(focal_loss,  gamma=2)# from callbacks
+    criterion = clo
     
     logger.log("DEBUG", 'INIT CALLBACKS') 
     train_cb = TrainCB(logger=logger, use_cuda=use_cuda)

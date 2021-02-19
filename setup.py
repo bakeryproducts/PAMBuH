@@ -32,6 +32,7 @@ setuptools.setup(
         "scipy",
         "yacs",
         "loguru",
+        "ttach"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

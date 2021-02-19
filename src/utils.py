@@ -171,12 +171,20 @@ def flatten_2dlist(list2d: List) -> List:
     list1d = list(itertools.chain(*list2d))
     return list1d
 
-def tiff_merge_mask(path_tiff, path_mask, path_dst):
+def tiff_merge_mask(path_tiff, path_mask, path_dst, path_mask2=None):
     # will use shitload of mem
     img = rasterio.open(path_tiff).read()
     mask = rasterio.open(path_mask).read()
     assert mask.max() <= 1 + 1e-6
-    img[1,...] = mask*200
+
+    img[1,...] = img.mean(0)
+    img[0,...] = mask*200
+
+    if path_mask2 is not None:
+        mask2 = rasterio.open(path_mask2).read()
+        assert mask2.max() <= 1 + 1e-6
+        img[2,...] = mask2*200
+
     _, h, w = img.shape
     dst = rasterio.open(path_dst, 'w', driver='GTiff', height=h, width=w, count=3, dtype=np.uint8)
     dst.write(img, [1,2,3]) # 3 bands

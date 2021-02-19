@@ -2,12 +2,14 @@ import sys
 from pathlib import Path
 from PIL import Image
 from functools import partial
+import yaml
 
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
 import albumentations as albu
+import ttach as tta
 
 import augs
 
@@ -69,7 +71,7 @@ def _infer_func(imgs, transform, scale, model):
     res = rescale(res, scale)
     return res
     
-def get_infer_func(root):
+def get_infer_func(root, use_tta=False):
     """
         Wraps model and preprocessing in one function with argument [img, ...]
         img is HWC (because of transforms)
@@ -85,8 +87,11 @@ def get_infer_func(root):
     transform = cfg_data.norm() 
 
     model_path = get_last_model(root / 'models')
-    model = nn_model.load_model(_, str(model_path))
+    model = nn_model.load_model('', str(model_path))
     model = model.cuda()
+    if use_tta: model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
+
+
 
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 

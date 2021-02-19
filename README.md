@@ -48,15 +48,12 @@ _____________
     ???
 
 4. pip package
-5. Actual research: 
-    cross-validate predictions on test data 
-    put each fold on kaggle
-    find worst test image
-6. COde based:
+
+5. COde based:
     - Docker
-    - TTA
-    - do padding in postp
-    - 
+    - models separation
+    - checkout domainhead
+    - crop size from .csv?? 
     - 
 
 

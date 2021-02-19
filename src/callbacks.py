@@ -56,7 +56,9 @@ class TrackResultsCB(sh.callbacks.Callback):
         tag = get_tag(self.batch)
         batch_size = xb.shape[0]
         #print(self.preds.shape, yb.shape, xb.shape)
-        dice = loss.dice_loss(torch.sigmoid(self.preds.cpu().float()), yb.cpu().float())
+        p = torch.sigmoid(self.preds.cpu().float())
+        p = (p>.5).float()
+        dice = loss.dice_loss(p, yb.cpu().float())
         #print(n, dice, dice*n)
         self.accs.append(dice * batch_size)
         self.samples_count.append(batch_size)
@@ -97,12 +99,6 @@ class TBMetricCB(TrackResultsCB):
         if self.model.training: self.after_epoch_train()
         else: self.after_epoch_valid()
         self.writer.flush()
-
-    def before_epoch(self):
-        self.accs,self.losses,self.samples_count = [],[],[]
-        #self.learner.extra_accs, self.learner.extra_samples_count = [], []
-
-
 
         
 class TBPredictionsCB(sh.callbacks.Callback):
@@ -195,7 +191,10 @@ class ValCB(sh.callbacks.Callback):
             tag = get_tag(batch)
             batch_size = xb.shape[0]
             #print(preds.shape, yb.shape, xb.shape)
-            dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
+            p = torch.sigmoid(preds.cpu().float())
+            p = (p>.5).float()
+            dice = loss.dice_loss(p, yb.cpu().float())
+            #dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
@@ -206,6 +205,5 @@ class ValCB(sh.callbacks.Callback):
         with torch.no_grad():
             xb, yb = self.batch
             self.learner.preds = self.model(xb)
-            self.learner.loss = self.loss_func(self.preds, yb)
-
+            self.learner.loss = self.loss_func(self.learner.preds, yb)
 

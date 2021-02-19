@@ -1,6 +1,4 @@
 import os
-import json
-import cv2
 import sys
 from pathlib import Path
 import multiprocessing as mp
@@ -13,6 +11,10 @@ from tqdm import tqdm
 
 import utils
 import rle2tiff
+
+import warnings
+warnings.filterwarnings("ignore", category=rio.errors.NotGeoreferencedWarning)
+
 
 def _count_blocks(dims, block_size=(256, 256)):
     nXBlocks = (int)((dims[0] + block_size[0] - 1) / block_size[0])
@@ -51,16 +53,16 @@ def crop_rio(p, y,x,h,w, bands=(1,2,3)):
     return block
 
 def paste(src, block, y,x,h,w):src[..., y:y+h, x:x+w] = block
-def paste_center_crop(src, part, block):
-    C,H,W = src.shape
-    y,x,h,w = block
+def paste_crop(src, part, block_cd, pad):
+    _,H,W = src.shape
+    y,x,h,w = block_cd
     
     h, w = min(h, H-y), min(w, W-x)  
-    y, x = get_shift_center(part, h,w)
-    part = crop(part, y, x, h, w)
-    paste(src, part, *block)
+    part = crop(part, pad, pad, h, w)
+    paste(src, part, *block_cd)
 
 def filter_block_out(block): return block.max()<5
+
 def infer_blocks(blocks, do_inference):
     blocks = do_inference(blocks).cpu().numpy()    
     blocks = (255*blocks).astype(np.uint8)
@@ -71,12 +73,11 @@ def image_q_reader(q, p, cds, pad):
     for block_cd in cds:
         padded_block_cd = pad_block(*block_cd, pad)
         block = crop_rio(p, *(padded_block_cd))
-        #print(f'Read block {block.shape, block.dtype}')
-        #if filter_block_out(block): continue
         q.put((block, block_cd))
         
-def mask_q_writer(q, H, W, total_blocks, root, result):
-    do_inference = infer.get_infer_func(root)
+def mask_q_writer(q, H, W, total_blocks, root, pad, result):
+
+    do_inference = infer.get_infer_func(root, use_tta=True)
     mask = np.zeros((1,H,W)).astype(np.uint8)
     count = 0
     bs = 8
@@ -89,9 +90,8 @@ def mask_q_writer(q, H, W, total_blocks, root, result):
                 blocks = [b[0] for b in batch]
                 block_cds = [b[1] for b in batch]
 
-                block_masks = infer_blocks(blocks, do_inference)#.squeeze(0)
-                #block_masks = [np.expand_dims(b[0], 0) for b in blocks]
-                [paste_center_crop(mask, block_mask, block_cd) for block_mask, block_cd in zip(block_masks, block_cds)]
+                block_masks = infer_blocks(blocks, do_inference)
+                [paste_crop(mask, block_mask, block_cd, pad) for block_mask, block_cd, block in zip(block_masks, block_cds, blocks) if block.mean() > 0]
                 batch = []
             else:
                 item = q.get()
@@ -106,7 +106,12 @@ def mask_q_writer(q, H, W, total_blocks, root, result):
         except Exception as e:
             print(e)
             break
+
     if batch:
+        blocks = [b[0] for b in batch]
+        block_cds = [b[1] for b in batch]
+        block_masks = infer_blocks(blocks, do_inference)
+        [paste_crop(mask, block_mask, block_cd, pad) for block_mask, block_cd, block in zip(block_masks, block_cds, blocks) if block.mean() > 0]
         #print('Drop last batch', len(batch))
         batch = []
     
@@ -117,7 +122,7 @@ def mp_func_wrapper(func, args): return func(*args)
 def chunkify(l, n): return [l[i:i + n] for i in range(0, len(l), n)]
 
 
-def launch_mpq(p, model_folder, block_size=512, pad=16, num_processes=1, show_tqdm=True, qsize=12):
+def launch_mpq(p, model_folder, block_size=512, pad=16, num_processes=1, qsize=24):
     m = mp.Manager()
     result = m.dict()
     q = m.Queue(maxsize=qsize)
@@ -132,18 +137,16 @@ def launch_mpq(p, model_folder, block_size=512, pad=16, num_processes=1, show_tq
     total_blocks = len(cds)
     writer = partial(mp_func_wrapper, mask_q_writer)
 
-    writer_p = mp.Process(target=writer, args=((q,H,W,total_blocks, model_folder, result),))
+    writer_p = mp.Process(target=writer, args=((q,H,W,total_blocks, model_folder, pad, result),))
     writer_p.start()        
     
-    
-    if show_tqdm: pbar = tqdm(total=len(reader_args))
     with mp.Pool(num_processes) as p:    
-        g = p.imap_unordered(reader, reader_args)
+        g = tqdm(p.imap_unordered(reader, reader_args), total=len(reader_args))
         for _ in g:
-            if show_tqdm: pbar.update()    
+            pass
     
-    print('joining')
     writer_p.join()
+    writer_p.terminate()
     mask = result['mask']
     print(mask.shape, mask.dtype, mask.max())
     return mask
@@ -166,11 +169,13 @@ if __name__ == '__main__':
     #model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
     #model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
     #model_folder = 'output/2021_Feb_15_15_06_52_PAMBUH/'
-    model_folder = 'output/2021_Feb_16_22_42_16_PAMBUH/'
+    #model_folder = 'output/2021_Feb_16_22_42_16_PAMBUH/'
+    #model_folder = 'output/2021_Feb_18_09_09_07_PAMBUH/'
+    model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
 
     block_size = 2048
-    pad = 0
-    threshold = 120
+    pad = 512
+    threshold = 200
     save_predicts = True
     join_predicts = True
 
@@ -186,11 +191,11 @@ if __name__ == '__main__':
         print(f'Creating mask for {img_name}')
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=8, qsize=32)[0]
 
-        mask = filter_mask(mask, img_name)
+        #mask = filter_mask(mask, img_name)
 
         mask[mask<threshold] = 0
         if save_predicts:
-            out_name = dst/img_name.name
+            out_name = dst/'masks'/img_name.name
             utils.save_tiff_uint8_single_band(mask, str(out_name))
             if join_predicts:
                 merge_name = dst/'merged'/img_name.name

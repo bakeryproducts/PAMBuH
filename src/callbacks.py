@@ -92,7 +92,7 @@ class TBMetricCB(TrackResultsCB):
         #self.log_debug('tb metric after validation')
         self.val_loss = sum(self.losses) / sum(self.samples_count)
         self.valid_dice =  sum(self.accs) / sum(self.samples_count)
-        self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
+        #self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
     def after_epoch(self):

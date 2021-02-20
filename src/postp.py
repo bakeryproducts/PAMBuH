@@ -1,9 +1,11 @@
 import os
+import json
 import sys
 from pathlib import Path
 import multiprocessing as mp
 from functools import partial
 
+import cv2
 import pandas as pd
 import numpy as np
 import rasterio as rio
@@ -166,17 +168,13 @@ if __name__ == '__main__':
     import infer
     os.environ['CPL_LOG'] = '/dev/null'
 
-    #model_folder = 'output/2021_Feb_12_20_08_44_PAMBUH/'
-    #model_folder = 'output/2021_Feb_13_18_17_53_PAMBUH/'
-    #model_folder = 'output/2021_Feb_15_15_06_52_PAMBUH/'
-    #model_folder = 'output/2021_Feb_16_22_42_16_PAMBUH/'
-    #model_folder = 'output/2021_Feb_18_09_09_07_PAMBUH/'
-    model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
+    #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
+    model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
 
     block_size = 2048
     pad = 512
     threshold = 200
-    save_predicts = True
+    save_predicts = False
     join_predicts = True
 
     src = Path('input/hm/test')
@@ -184,12 +182,12 @@ if __name__ == '__main__':
     dst = Path('output/predicts')
     df = pd.read_csv('input/hm/sample_submission.csv', index_col='id')
     img_names = list(img_names)
-    #print(list(img_names))
+    print(list(img_names))
 
     for img_name in img_names:
-        #img_name = img_names[-1]
+        #img_name = img_names[2]
         print(f'Creating mask for {img_name}')
-        mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=8, qsize=32)[0]
+        mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=8, qsize=16)[0]
 
         #mask = filter_mask(mask, img_name)
 

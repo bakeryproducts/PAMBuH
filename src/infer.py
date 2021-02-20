@@ -87,6 +87,7 @@ def get_infer_func(root, use_tta=False):
     transform = cfg_data.norm() 
 
     model_path = get_last_model(root / 'models')
+    print(f'Selecting model: {model_path}')
     model = nn_model.load_model('', str(model_path))
     model = model.cuda()
     if use_tta: model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')

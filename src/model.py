@@ -333,8 +333,8 @@ def tencent_trick(model):
 
 
 def model_select():
-    #return Unet
-    return att_unet
+    return Unet
+    #return att_unet
 
 def build_model(cfg):
     base_lr = 1e-4# should be overriden in LR scheduler anyway

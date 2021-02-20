@@ -16,7 +16,7 @@ from callbacks import *
 import loss
 
 def clo(logits, predicts):
-    w1 = .3
+    w1 = .4
     w2 = 1 - w1 
     l1 = loss.lovasz_hinge(logits, predicts) 
     l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts)
@@ -24,7 +24,7 @@ def clo(logits, predicts):
 
 
 def start(cfg, output_folder, n_epochs, use_cuda=True):
-    datasets = build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'VALID2'])
+    datasets = build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
     dls = build_dataloaders(cfg, datasets, pin=True, drop_last=False)
     model, opt = build_model(cfg)
 
@@ -34,7 +34,7 @@ def start(cfg, output_folder, n_epochs, use_cuda=True):
     
     logger.log("DEBUG", 'INIT CALLBACKS') 
     train_cb = TrainCB(logger=logger)
-    val_cb = ValCB(dl=dls["VALID2"], logger=logger)
+    val_cb = ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
         utils.dump_params(cfg, output_folder)

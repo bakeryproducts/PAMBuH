@@ -71,4 +71,4 @@ if __name__  == "__main__":
     if cfg.PARALLEL.IS_MASTER: logger.debug('\n' + cfg.dump(indent=4))
     output_folder = init_output_folder(cfg)
     log_init(output_folder)
-    start(cfg, output_folder, n_epochs=cfg.TRAIN.EPOCH_COUNT, use_cuda=True)
+    start(cfg, output_folder)

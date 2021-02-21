@@ -190,7 +190,7 @@ def create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_l
     )
     return dl
 
-def build_dataloaders(cfg, datasets, samplers=None, drop_last=False, pin=False):
+def build_dataloaders(cfg, datasets, samplers=None, pin=False, drop_last=False):
     '''
         Builds dataloader from datasets dictionary {'TRAIN':ds1, 'VALID':ds2}
         dataloaders :

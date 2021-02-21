@@ -187,9 +187,13 @@ class ValCB(sh.callbacks.Callback):
         self.learner.extra_accs, self.learner.extra_samples_count = [], []
         for batch in self.extra_valid_dl:
             xb, yb = get_xb_yb(batch)
-            preds = self.model(xb.cuda())
             tag = get_tag(batch)
             batch_size = xb.shape[0]
+
+            with torch.no_grad():
+                with torch.cuda.amp.autocast():
+                    preds = self.model(xb)
+
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
             p = (p>.5).float()
@@ -200,10 +204,10 @@ class ValCB(sh.callbacks.Callback):
             self.learner.extra_samples_count.append(batch_size)
             #self.learner.losses.append(self.loss.detach().item()*batch_size)
 
-    @sh.utils.on_master
     def val_step(self):
+        xb, yb = self.batch
         with torch.no_grad():
-            xb, yb = self.batch
-            self.learner.preds = self.model(xb)
-            self.learner.loss = self.loss_func(self.learner.preds, yb)
+            with torch.cuda.amp.autocast():
+                self.learner.preds = self.model(xb)
+                self.learner.loss = self.loss_func(self.preds, yb)
 

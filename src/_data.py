@@ -1,3 +1,4 @@
+import random
 from PIL import Image
 from pathlib import Path
 from functools import partial, reduce
@@ -158,6 +159,14 @@ class PreloadingDataset:
         return len(self.data)
 
 
+class FoldDataset:
+    def __init__(self, dataset, idxs):
+        self.dataset = dataset
+        self.idxs = idxs
+    def __len__(self): return len(self.idxs)
+    def __getitem__(self, idx): return self.dataset[self.idxs[idx]]
+
+
 def extend_dataset(ds, data_field, extend_factories):
     for k, factory in extend_factories.items():
         field_val = data_field.get(k, None) 
@@ -236,5 +245,38 @@ def mean_std_dataset(dataset, parts=200):
             #break
     return np.array(mm).mean(0), np.array(ss).mean(0)
 
+
+def make_datasets_folds(cfg, datasets, n, shuffle=False):
+    '''
+        Returns [{'TRAIN':ds1, 'VALID':ds2}, {}, ...]
+    '''
+    folded_datasets = [{} for _ in range(n)]
+    dataset = datasets['TRAIN']
+    rate = cfg.DATA.TRAIN.MULTIPLY.rate
+    
+    fold_idxs = generate_folds_idxs(rate, dataset, n, shuffle)
+    folds = [FoldDataset(dataset, idxs) for idxs in fold_idxs]
+
+    for i in range(n):
+        train_folds = [folds[j] for j in range(n) if  j!=i]
+        test_fold = folds[i]
+        folded_datasets[i]['VALID'] = test_fold
+        folded_datasets[i]['TRAIN'] = ConcatDataset(train_folds)
+    
+    return folded_datasets
+
+def generate_folds_idxs(rate, dataset, n_folds, shuffle=False, seed=42):
+    act_len = len(dataset) // rate
+    l = list(range(act_len))
+    if shuffle: 
+        random.seed(seed)
+        random.shuffle(l)
+    
+    split_idxs = np.array_split(l, n_folds)
+    splits = []
+    for split_idx in split_idxs:
+        split_with_dups = [split_idx + i*act_len for i in range(rate)]
+        splits.append(np.concatenate(split_with_dups))
+    return splits
 
 

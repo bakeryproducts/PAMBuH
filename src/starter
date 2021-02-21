@@ -10,7 +10,7 @@ args = parser.parse_args()
 cfg_init(args.cfg)
 nproc_per_node = len(cfg.TRAIN.GPUS)
 cmd_dist = f'python3  -m torch.distributed.launch --nproc_per_node={nproc_per_node} src/main.py --cfg {args.cfg}'
-cmd_single = 'python3 src/main.py --cfg {args.cfg}'
+cmd_single = f'python3 src/main.py --cfg {args.cfg}'
             
 cmd = cmd_dist if cfg.PARALLEL.DDP else cmd_single
 p = subprocess.Popen(cmd, shell=True)

@@ -350,7 +350,6 @@ def build_model(cfg):
     
     if cfg.PARALLEL.DDP: model = DistributedDataParallel(model, device_ids=[cfg.PARALLEL.LOCAL_RANK])
     model.train()
-    
     return model, optimizer
 
 def load_model(cfg, path):
@@ -372,3 +371,11 @@ def load_model(cfg, path):
     model.eval()
     return model
 
+class FoldModel(nn.Module):
+    def __init__(self, models):
+        super(FoldModel, self).__init__()
+        self.ms = models
+        
+    def forward(self, x):
+        res = torch.stack([m(x) for m in self.ms])
+        return res.mean(0)

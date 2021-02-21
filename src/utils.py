@@ -80,14 +80,7 @@ def make_folders(cfg):
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     name = Path(timestamp + '_' + cfg_postfix)
     fname = cfg.OUTPUTS / name
-    os.makedirs(fname, exist_ok=True)
-    img_dir = fname / 'imgs'
-    os.makedirs(img_dir, exist_ok=True)
-    models_dir = fname / 'models'
-    os.makedirs(models_dir, exist_ok=True)
-    tb_dir = fname / 'tb'
-    os.makedirs(tb_dir, exist_ok=True)
-
+    fname.mkdir(exist_ok=True)
     return fname
 
 def save_models(d, postfix, output_folder):

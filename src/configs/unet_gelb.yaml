@@ -3,13 +3,13 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train1024x05', 'backs_30_1024']
+    DATASETS: ['train1024x25', 'backs_30_x25_1024']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
-    MULTIPLY: {'rate':5}
+    MULTIPLY: {'rate':10}
   VALID:
-    DATASETS: ['val1024x05']
+    DATASETS: ['val1024x25']
     PRELOAD: False
   VALID2:
     PRELOAD: False
@@ -25,23 +25,24 @@ TRANSFORMERS:
     AUG: 'val'
   TEST:
     AUG: 'test'
-  CROP: [256, 256]
+  CROP: [128, 128]
   RESIZE: [128, 128]
 
 TRAIN:
-  DOWNSCALE: 2
+  DOWNSCALE: 4
+  NUM_FOLDS: 4
   AMP: True
   GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
-  SAVE_STEP: .2
+  SAVE_STEP: 1.
   SCALAR_STEP: 1
-  TB_STEP: 20
+  TB_STEP: 10
   
-  EPOCH_COUNT: 500
+  EPOCH_COUNT: 200
   BATCH_SIZE: 64
 VALID:
-  STEP: 20
+  STEP: 10
   BATCH_SIZE: 32
 TEST:
   BATCH_SIZE: 1

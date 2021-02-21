@@ -71,28 +71,43 @@ def _infer_func(imgs, transform, scale, model):
     res = rescale(res, scale)
     return res
     
+def get_model(root, cfg_data):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("model", str(root)+'src/model.py')
+    nn_model = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(nn_model)
+
+    num_folds = cfg_data['TRAIN']['NUM_FOLDS'] 
+    if num_folds <=1:
+        model_path = get_last_model(root / 'models')
+        print(f'Selecting model: {model_path}')
+        model = nn_model.load_model('', str(model_path))
+    else:
+        models = []
+        for i in range(num_folds):
+            model_path = get_last_model(root / f'fold_{i}' /'models')
+            print(f'Selecting model: {model_path}')
+            model = nn_model.load_model(None, str(model_path))
+            models.append(model)
+        model = FoldModel(models)
+
+    model = model.cuda()
+    return model
+
 def get_infer_func(root, use_tta=False):
     """
         Wraps model and preprocessing in one function with argument [img, ...]
         img is HWC (because of transforms)
         Returns torch tensor on CUDA, [len(inp), 1, H, W]
     """
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("model", str(root)+'src/model.py')
-    nn_model = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(nn_model)
-
     root = Path(root)
     cfg_data = CfgParse(root/'cfg.yaml')
     transform = cfg_data.norm() 
 
-    model_path = get_last_model(root / 'models')
-    print(f'Selecting model: {model_path}')
-    model = nn_model.load_model('', str(model_path))
-    model = model.cuda()
-    if use_tta: model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
-
-
+    model = get_model(root, cfg_data)
+    if use_tta: 
+        model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
+    
 
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 

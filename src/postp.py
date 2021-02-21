@@ -149,10 +149,12 @@ def filter_mask(mask, name):
     return mask
 
 if __name__ == '__main__':
+    os.environ['CPL_LOG'] = '/dev/null'
     import infer
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
-    model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
+    #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
+    model_folder = 'output/2021_Feb_21_14_17_41_PAMBUH/'
 
     block_size = 2048
     pad = 512
@@ -170,7 +172,7 @@ if __name__ == '__main__':
     print(list(img_names))
 
     for img_name in img_names:
-       #img_name = img_names[2]
+        img_name = img_names[2]
         print(f'Creating mask for {img_name}')
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=num_processes, qsize=qsize)
         #mask = filter_mask(mask, img_name)
@@ -187,7 +189,7 @@ if __name__ == '__main__':
         mask = mask.clip(0,1)
         rle = rle2tiff.mask2rle(mask)
         df.loc[img_name.stem] = rle
-        #break
+        break
 
     df.to_csv('submission.csv')
     

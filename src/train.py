@@ -4,14 +4,14 @@ import time
 from pathlib import Path
 from functools import partial
 
-import numpy as np
 import torch
+import numpy as np
 from fastprogress.fastprogress import master_bar, progress_bar
 
-import shallow as sh
 import data
 import loss
 import utils
+import shallow as sh
 from logger import logger
 from config import cfg, cfg_init
 from model import build_model
@@ -88,10 +88,9 @@ def start_fold(cfg, output_folder, datasets):
         epoch_bar = master_bar(range(n_epochs))
         batch_bar = partial(progress_bar, parent=epoch_bar)
     else: epoch_bar, batch_bar = range(n_epochs), lambda x:x
+
     logger.log("DEBUG", 'LEARNER') 
-
     val_interval = cfg.VALID.STEP
-
     learner = sh.learner.Learner(model, opt, sh.utils.AttrDict(dls), criterion, 0, cbs, batch_bar, epoch_bar, val_interval, cfg=cfg)
     learner.fit(n_epochs)
 

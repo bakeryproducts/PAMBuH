@@ -1,13 +1,12 @@
 import sys
-from pathlib import Path
-from PIL import Image
-from functools import partial
 import yaml
+from PIL import Image
+from pathlib import Path
+from functools import partial
 
 import cv2
-import numpy as np
 import torch
-import torch.nn.functional as F
+import numpy as np
 import albumentations as albu
 import ttach as tta
 
@@ -18,7 +17,8 @@ class CfgParse:
         self.compose = albu.Compose
         data = self.parse_yaml(cfg_file)
         self.mean = data['TRANSFORMERS']['MEAN']
-        self.std = data['TRANSFORMERS']['STD']        
+        self.std = data['TRANSFORMERS']['STD']
+        self.num_folds = data['TRAIN']['NUM_FOLDS']
         self.scale = self.get_scale(data)
         assert self.scale is not None
 
@@ -51,13 +51,13 @@ def get_last_model(src):
     idx = sorted(res, key=lambda x: -x[1])[0][0]
     return models[idx]
 
-def rescale(batch_img, scale): return F.interpolate(batch_img, scale_factor=(scale, scale))
+def rescale(batch_img, scale): 
+    return torch.nn.functional.interpolate(batch_img, scale_factor=(scale, scale))
 
 def preprocess_image(img, scale, transform):
     ch, H,W, dtype = *img.shape, img.dtype
     assert ch==3 and dtype==np.uint8
     img = img.transpose(1,2,0)
-
     img = cv2.resize(img, (W // scale, H // scale))
     return transform(image=img)['image']
 
@@ -73,24 +73,23 @@ def _infer_func(imgs, transform, scale, model):
     
 def get_model(root, cfg_data):
     import importlib.util
-    spec = importlib.util.spec_from_file_location("model", str(root)+'src/model.py')
+    spec = importlib.util.spec_from_file_location("model", str(root/'src/model.py'))
     nn_model = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(nn_model)
 
-    num_folds = cfg_data['TRAIN']['NUM_FOLDS'] 
+    num_folds = cfg_data.num_folds
     if num_folds <=1:
         model_path = get_last_model(root / 'models')
-        print(f'Selecting model: {model_path}')
+        print(f'Single Fold: Selecting model: {model_path}')
         model = nn_model.load_model('', str(model_path))
     else:
         models = []
         for i in range(num_folds):
             model_path = get_last_model(root / f'fold_{i}' /'models')
-            print(f'Selecting model: {model_path}')
+            print(f'Fold #{i}; Selecting model: {model_path}')
             model = nn_model.load_model(None, str(model_path))
-            models.append(model)
-        model = FoldModel(models)
-
+            models.append(model.cuda())
+        model = nn_model.FoldModel(models)
     model = model.cuda()
     return model
 
@@ -103,11 +102,9 @@ def get_infer_func(root, use_tta=False):
     root = Path(root)
     cfg_data = CfgParse(root/'cfg.yaml')
     transform = cfg_data.norm() 
-
     model = get_model(root, cfg_data)
     if use_tta: 
         model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
-    
 
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 

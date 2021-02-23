@@ -18,11 +18,12 @@ from model import build_model
 from callbacks import *
 
 
-def clo(logits, predicts):
+def clo(logits, predicts, reduction='none'):
     w1 = .2
     w2 = 1 - w1 
-    l1 = loss.lovasz_hinge(logits, predicts) 
-    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts)
+    l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
+    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts, reduction=reduction)
+    if reduction == 'none': l2 = l2.mean((1,2,3))
     return l1*w1 + l2*w2
 
 def start(cfg, output_folder):
@@ -43,7 +44,7 @@ def start(cfg, output_folder):
 
 def start_fold(cfg, output_folder, datasets):
     n_epochs = cfg.TRAIN.EPOCH_COUNT
-    dls = data.build_dataloaders(cfg, datasets, pin=True, drop_last=True)
+    dls = data.build_dataloaders(cfg, datasets, selective=False)
     model, opt = build_model(cfg)
 
     criterion = clo
@@ -73,12 +74,12 @@ def start_fold(cfg, output_folder, datasets):
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
     l0,l1,l2 = 5e-5, 2e-4,5e-5
-    scale = 1 #1/ cfg.PARALLEL.WORLD_SIZE
+    scale = 1 / 6 #cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.075, sh.schedulers.sched_cos(l0,l1)],
-        [.925, sh.schedulers.sched_cos(l1,l2)]])
+        [.025, sh.schedulers.sched_cos(l0,l1)],
+        [.975, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
     cbs = [CudaCB(), train_cb, val_cb, lrcb]
         

@@ -148,13 +148,36 @@ def filter_mask(mask, name):
     mask = mask * buf
     return mask
 
+def global_shift_mask(name, maskpred1):
+    """
+    applies a global shift to a mask by padding one side and cropping from the other
+    """
+    TARGET_ID = 'afa5e8098'
+    y_shift = -40
+    x_shift = -24
+    if name != TARGET_ID: return maskpred1
+
+    if y_shift <0 and x_shift >=0:
+        maskpred2 = np.pad(maskpred1, [(0,abs(y_shift)), (abs(x_shift), 0)], mode='constant', constant_values=0)
+        maskpred3 = maskpred2[abs(y_shift):, :maskpred1.shape[1]]
+    elif y_shift >=0 and x_shift <0:
+        maskpred2 = np.pad(maskpred1, [(abs(y_shift),0), (0, abs(x_shift))], mode='constant', constant_values=0)
+        maskpred3 = maskpred2[:maskpred1.shape[0], abs(x_shift):]
+    elif y_shift >=0 and x_shift >=0:
+        maskpred2 = np.pad(maskpred1, [(abs(y_shift),0), (abs(x_shift), 0)], mode='constant', constant_values=0)
+        maskpred3 = maskpred2[:maskpred1.shape[0], :maskpred1.shape[1]]
+    elif y_shift < 0 and x_shift < 0:
+        maskpred2 = np.pad(maskpred1, [(0, abs(y_shift)), (0, abs(x_shift))], mode='constant', constant_values=0)
+        maskpred3 = maskpred2[abs(y_shift):, abs(x_shift):]
+    return maskpred3
+
 if __name__ == '__main__':
     os.environ['CPL_LOG'] = '/dev/null'
     import infer
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
     #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    model_folder = 'output/2021_Feb_21_14_17_41_PAMBUH/'
+    model_folder = 'output/2021_Feb_23_17_04_53_PAMBUH/'
 
     block_size = 2048
     pad = 512
@@ -164,6 +187,7 @@ if __name__ == '__main__':
     save_predicts = False
     join_predicts = True
 
+
     src = Path('input/hm/test')
     img_names = src.glob('*.tiff')
     dst = Path('output/predicts')
@@ -172,11 +196,12 @@ if __name__ == '__main__':
     print(list(img_names))
 
     for img_name in img_names:
-        img_name = img_names[2]
+        #img_name = img_names[-2]
         print(f'Creating mask for {img_name}')
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=num_processes, qsize=qsize)
         #mask = filter_mask(mask, img_name)
         mask[mask<threshold] = 0
+        mask = global_shift_mask(img_name.stem, mask)
 
         if save_predicts:
             out_name = dst/'masks'/img_name.name
@@ -189,9 +214,9 @@ if __name__ == '__main__':
         mask = mask.clip(0,1)
         rle = rle2tiff.mask2rle(mask)
         df.loc[img_name.stem] = rle
-        break
+        #break
 
-    df.to_csv('submission.csv')
+    df.to_csv(model_folder + 'submission.csv')
     
 
 

@@ -345,6 +345,8 @@ def build_model(cfg):
     model = model.cuda()
     
     opt = optim.AdamW
+    #opt = optim.SGD
+    #opt_kwargs = {'momentum':0.9, 'weight_decay':1e-2}
     opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
     

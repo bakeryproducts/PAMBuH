@@ -108,7 +108,7 @@ def iou(preds, labels, C, EMPTY=1., ignore=None, per_image=False):
 # --------------------------- BINARY LOSSES ---------------------------
 
 
-def lovasz_hinge(logits, labels, per_image=True, ignore=None):
+def lovasz_hinge(logits, labels, ignore=None, reduction='none'):
     """
     Binary Lovasz hinge loss
       logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
@@ -116,12 +116,9 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None):
       per_image: compute the loss per image instead of per batch
       ignore: void class id
     """
-    if per_image:
-        loss = mean(lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore))
-                          for log, lab in zip(logits, labels))
-    else:
-        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore))
-    return loss
+    loss = [lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore)) for log, lab in zip(logits, labels)]
+    if reduction == 'mean': loss = mean(loss)
+    return torch.tensor(loss).float().cuda()
 
 
 def lovasz_hinge_flat(logits, labels):

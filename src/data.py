@@ -11,15 +11,14 @@ import numpy as np
 from tqdm.auto import tqdm
 import albumentations as albu
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.dataset import ConcatDataset as TorchConcatDataset
 
 import utils
 import augs
-from sampler import GdalSampler
-
-
 from _data import *
-#from _data import ImageDataset, PairDataset, ConcatDataset, expander, expander_float, mean_std_dataset, create_transforms, TransformDataset, update_mean_std
+from sampler import GdalSampler
+from nn_sampler import SelectiveSampler, DistributedSamplerWrapper
 
 class SegmentDataset:
     '''
@@ -104,6 +103,7 @@ def init_datasets(cfg):
         "val1024x05": SegmentDataset(DATA_DIR/'SPLITS/split1024x05/val/imgs', DATA_DIR/'SPLITS/split1024x05/val/masks'),
         "backs_30_1024": SegmentDataset(DATA_DIR/'backs030/imgs', DATA_DIR/'backs030/masks'),
 
+        "full1024x25": SegmentDataset(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25//masks'),
         "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
         "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
         "val2_1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val2/imgs', DATA_DIR/'SPLITS/split1024x25/val2/masks'),
@@ -177,20 +177,7 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
     datasets = apply_transforms_datasets(datasets, transforms)
     return datasets
 
-def create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_last, pin):
-    dl = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=pin,
-        drop_last=drop_last,
-        collate_fn=None,
-        sampler=sampler,
-    )
-    return dl
-
-def build_dataloaders(cfg, datasets, samplers=None, pin=False, drop_last=False):
+def build_dataloaders(cfg, datasets, selective=True):
     '''
         Builds dataloader from datasets dictionary {'TRAIN':ds1, 'VALID':ds2}
         dataloaders :
@@ -198,28 +185,44 @@ def build_dataloaders(cfg, datasets, samplers=None, pin=False, drop_last=False):
                 'TRAIN': <sadd21e>.obj.dataloader,
                     ...
             }
-        TODO: refactor parameters loading loop
     '''
     dls = {}
-    batch_sizes = {'TRAIN': cfg.TRAIN.BATCH_SIZE,
-                    'VALID': cfg.VALID.BATCH_SIZE,
-                    'VALID2': cfg.VALID.BATCH_SIZE
-                    }
-
-    samplers = {'TRAIN':None, 'VALID':None, 'VALID2':None}
-    num_workers = cfg.TRAIN.NUM_WORKERS
     for kind, dataset in datasets.items():
-        if cfg.PARALLEL.DDP and kind == 'TRAIN':
-                samplers['TRAIN'] = torch.utils.data.distributed.DistributedSampler(dataset,
-                                                                    num_replicas=cfg.PARALLEL.WORLD_SIZE,
-                                                                    rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
-        sampler = samplers[kind]    
-        #shuffle = kind == 'TRAIN' if sampler is None else False
-        shuffle = sampler is None
-        batch_size = batch_sizes[kind] if batch_sizes[kind] is not None else 1
-        dls[kind] = create_dataloader(dataset, sampler, shuffle, batch_size, num_workers, drop_last, pin)
-            
+        dls[kind] = build_dataloader(cfg, dataset, kind, selective=selective)
     return dls
+
+
+def build_dataloader(cfg, dataset, mode, selective):
+    drop_last = False
+
+    bs = cfg[mode]['BATCH_SIZE']
+    num_workers = cfg.TRAIN.NUM_WORKERS
+    
+    sampler = None 
+    if selective:
+        _s = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
+        indxs = list(_s)
+        dataset = FoldDataset(dataset, indxs)
+        weights = torch.ones(len(dataset))
+        #weights[:int(len(dataset)*.2)] *= 100 
+        sampler = SelectiveSampler(weights) 
+
+    if cfg.PARALLEL.DDP and mode == 'TRAIN':
+        if sampler is None:
+            sampler = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
+
+    shuffle = sampler is None
+
+    dl = DataLoader(
+        dataset,
+        batch_size=bs,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=drop_last,
+        collate_fn=None,
+        sampler=sampler,)
+    return dl
 
 
 

@@ -1,3 +1,4 @@
+import time
 import os
 from pathlib import Path
 from functools import partial
@@ -145,31 +146,67 @@ class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
         self.scaler = torch.cuda.amp.GradScaler() 
+
+    def before_fit(self):
+        self.sbp_pct = self.kwargs['cfg'].TRAIN.SELECTIVE_BP
+        self.loss_mean = 0
     
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
+        self.learner.unreduced_loss = []
     
     def train_step(self):
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
             
         xb, yb = self.batch
-
         if self.kwargs['cfg'].TRAIN.AMP:
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
-                self.learner.loss = self.loss_func(self.preds, yb)
-            self.scaler.scale(self.learner.loss).backward()
-            self.scaler.step(self.learner.opt)
-            self.scaler.update()
+                u_loss = self.loss_func(self.preds, yb, reduction='none')
+                self.learner.loss = u_loss.mean() 
+
+            if self.np_batch <= self.sbp_pct:
+                self.scaler.scale(self.learner.loss).backward()
+                self.scaler.step(self.learner.opt)
+                self.scaler.update()
         else:
             self.learner.preds = self.model(xb)
-            self.learner.loss = self.loss_func(self.preds, yb)
-            self.learner.loss.backward()
-            self.learner.opt.step()
+            u_loss = self.loss_func(self.preds, yb, reduction='none')
+            self.learner.loss = u_loss.mean() 
+
+            if self.np_batch <= self.sbp_pct:
+                self.learner.loss.backward()
+                self.learner.opt.step()
             
         self.learner.opt.zero_grad()
+        #self.learner.unreduced_loss.extend(u_loss.detach().cpu())
+
+    @sh.utils.on_train
+    def __after_epoch(self):
+        sampler = self.learner.dl.sampler
+        #print(sampler, len(sampler), len(sampler.sampler))
+        l = torch.tensor(self.learner.unreduced_loss)
+        #print(l.shape, l.mean())
+        #if isinstance(sampler, SelectiveSampler):
+        idxs = sampler.dataset.sampler_list[:10]
+        best = [sampler.sampler.weights[i] for i in idxs]
+        #print('best', l[:20].mean())
+        #print('b', torch.tensor(best))
+
+        idxs = sampler.dataset.sampler_list[-10:]
+        worst = [sampler.sampler.weights[i] for i in idxs]
+        #print('w', torch.tensor(worst))
+        #print('wors', l[-20:].mean())
+        #print(sum(sampler.sampler.dataset.sampler_list))
+
+        sampler.set_weights(self.losses_to_weights(l))
+        #print(sampler.sampler.sampler.weights)
+        #time.sleep(10)
+    
+    def losses_to_weights(self, l):
+        return  (1+l*2)**1.5
 
 class ValCB(sh.callbacks.Callback):
     def __init__(self, dl=None, logger=None):
@@ -202,12 +239,12 @@ class ValCB(sh.callbacks.Callback):
             #print(n, dice, dice*n)
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
-            #self.learner.losses.append(self.loss.detach().item()*batch_size)
 
     def val_step(self):
         xb, yb = self.batch
         with torch.no_grad():
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
-                self.learner.loss = self.loss_func(self.preds, yb)
+                u_loss = self.loss_func(self.preds, yb, reduction='none')
+                self.learner.loss = u_loss.mean() 
 

@@ -118,7 +118,7 @@ def lovasz_hinge(logits, labels, ignore=None, reduction='none'):
     """
     loss = [lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore)) for log, lab in zip(logits, labels)]
     if reduction == 'mean': loss = mean(loss)
-    return torch.tensor(loss).float().cuda()
+    return loss
 
 
 def lovasz_hinge_flat(logits, labels):

@@ -1,17 +1,20 @@
-import time
 import os
+import time
+import datetime
+import pickle
 from pathlib import Path
 from functools import partial
+from collections import defaultdict
 
 import numpy as np
 import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
-import shallow as sh
 import utils
-from logger import logger
 import loss
+import shallow as sh
+from logger import logger
 
 
 def upscale(tensor, size): return torch.nn.functional.interpolate(tensor, size=size)
@@ -142,15 +145,71 @@ class TBPredictionsCB(sh.callbacks.Callback):
             self.process_write_predictions()
 
 
+class SelectiveTrainCB(sh.callbacks.Callback):
+    def __init__(self, logger=None): 
+        sh.utils.store_attr(self, locals())
+        self.scaler = torch.cuda.amp.GradScaler() 
+        self._timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
+        ('losses' / Path(self._timestamp)).mkdir()
+        self.counter = defaultdict(int)
+
+    def before_fit(self): self.sbp_pct = self.kwargs['cfg'].TRAIN.SELECTIVE_BP
+    
+    @sh.utils.on_train
+    def before_epoch(self):
+        if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
+        self.learner.unreduced_loss = []
+    
+    def train_step(self):
+        for i in range(len(self.opt.param_groups)): self.learner.opt.param_groups[i]['lr'] = self.lr  
+            
+        xb, yb = self.batch
+        with torch.cuda.amp.autocast():
+            self.learner.preds = self.model(xb)
+            u_loss = self.loss_func(self.preds, yb, reduction='none')
+            self.learner.loss = u_loss.mean() 
+
+        if self.np_batch <= self.sbp_pct:
+            self.scaler.scale(self.learner.loss).backward()
+            self.scaler.step(self.learner.opt)
+            self.scaler.update()
+            
+        self.learner.opt.zero_grad()
+        self.learner.unreduced_loss.extend(u_loss.detach().cpu())
+
+    @sh.utils.on_train
+    def after_epoch(self):
+        l = torch.tensor(self.learner.unreduced_loss)
+        self.learner.dls['TRAIN'].sampler.set_weights(self.losses_to_weights(l))
+
+
+        if self.kwargs['cfg'].PARALLEL.IS_MASTER:
+            ws = np.zeros_like(self.learner.dls['TRAIN'].sampler.sampler.weights)
+            c = 0 
+            for w, idx in zip(l, self.learner.dls['TRAIN'].sampler.dataset.sampler_list):
+                ws[idx] = w
+                if c < l.shape[0] * self.kwargs['cfg'].TRAIN.SELECTIVE_BP:
+                    self.counter[idx]+=1
+                c+=1
+
+            name = f'losses/{self._timestamp}/ll_' + f'{self.n_epoch}'.zfill(5) + '.npy'
+            with open(name, 'wb') as f:
+                np.save(f, ws)
+            name = f'losses/{self._timestamp}/ll_' + f'{self.n_epoch}'.zfill(5) + '.pkl'
+            with open(name, 'wb') as f:
+                pickle.dump(self.counter, f)
+
+    def losses_to_weights(self, l):
+        #return  (1+l)**2
+        return  np.percentile(l.numpy(), l)
+
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
         self.scaler = torch.cuda.amp.GradScaler() 
 
-    def before_fit(self):
-        self.sbp_pct = self.kwargs['cfg'].TRAIN.SELECTIVE_BP
-        self.loss_mean = 0
-    
+    def before_fit(self): self.reduction = 'mean'
+
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
@@ -164,49 +223,18 @@ class TrainCB(sh.callbacks.Callback):
         if self.kwargs['cfg'].TRAIN.AMP:
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
-                u_loss = self.loss_func(self.preds, yb, reduction='none')
-                self.learner.loss = u_loss.mean() 
-
-            if self.np_batch <= self.sbp_pct:
+                self.learner.loss= self.loss_func(self.preds, yb, reduction=self.reduction)
                 self.scaler.scale(self.learner.loss).backward()
                 self.scaler.step(self.learner.opt)
                 self.scaler.update()
         else:
             self.learner.preds = self.model(xb)
-            u_loss = self.loss_func(self.preds, yb, reduction='none')
-            self.learner.loss = u_loss.mean() 
-
-            if self.np_batch <= self.sbp_pct:
-                self.learner.loss.backward()
-                self.learner.opt.step()
+            self.learner.loss= self.loss_func(self.preds, yb, reduction=self.reduction)
+            self.learner.loss.backward()
+            self.learner.opt.step()
             
         self.learner.opt.zero_grad()
-        #self.learner.unreduced_loss.extend(u_loss.detach().cpu())
 
-    @sh.utils.on_train
-    def __after_epoch(self):
-        sampler = self.learner.dl.sampler
-        #print(sampler, len(sampler), len(sampler.sampler))
-        l = torch.tensor(self.learner.unreduced_loss)
-        #print(l.shape, l.mean())
-        #if isinstance(sampler, SelectiveSampler):
-        idxs = sampler.dataset.sampler_list[:10]
-        best = [sampler.sampler.weights[i] for i in idxs]
-        #print('best', l[:20].mean())
-        #print('b', torch.tensor(best))
-
-        idxs = sampler.dataset.sampler_list[-10:]
-        worst = [sampler.sampler.weights[i] for i in idxs]
-        #print('w', torch.tensor(worst))
-        #print('wors', l[-20:].mean())
-        #print(sum(sampler.sampler.dataset.sampler_list))
-
-        sampler.set_weights(self.losses_to_weights(l))
-        #print(sampler.sampler.sampler.weights)
-        #time.sleep(10)
-    
-    def losses_to_weights(self, l):
-        return  (1+l*2)**1.5
 
 class ValCB(sh.callbacks.Callback):
     def __init__(self, dl=None, logger=None):
@@ -219,6 +247,7 @@ class ValCB(sh.callbacks.Callback):
         if self.extra_valid_dl is not None:
             self.run_extra_valid()
         self.learner.metrics = []
+        self.reduction = 'none' if self.kwargs['cfg'].TRAIN.SELECTIVE_BP <1 - 1e-6 else 'mean'
 
     def run_extra_valid(self):
         self.learner.extra_accs, self.learner.extra_samples_count = [], []
@@ -245,6 +274,6 @@ class ValCB(sh.callbacks.Callback):
         with torch.no_grad():
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
-                u_loss = self.loss_func(self.preds, yb, reduction='none')
-                self.learner.loss = u_loss.mean() 
+                self.learner.loss = self.loss_func(self.preds, yb, reduction=self.reduction)
+                
 

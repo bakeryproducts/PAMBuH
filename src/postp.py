@@ -1,4 +1,5 @@
 import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import json
 import sys
 from pathlib import Path
@@ -177,7 +178,10 @@ if __name__ == '__main__':
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
     #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    model_folder = 'output/2021_Feb_23_17_04_53_PAMBUH/'
+    #model_folder = 'output/2021_Feb_23_17_04_53_PAMBUH/'
+    #model_folder = 'output/2021_Feb_24_23_21_13_PAMBUH/'
+    #model_folder = 'output/2021_Feb_27_00_37_10_PAMBUH/'
+    model_folder = 'output/2021_Feb_27_21_00_22_PAMBUH/'
 
     block_size = 2048
     pad = 512

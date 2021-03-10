@@ -19,7 +19,7 @@ from callbacks import *
 
 
 def clo(logits, predicts, reduction='none'):
-    w1 = .2
+    w1 = .33
     w2 = 1 - w1 
     l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
     l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts, reduction=reduction)
@@ -44,11 +44,12 @@ def start(cfg, output_folder):
 
 def start_fold(cfg, output_folder, datasets):
     n_epochs = cfg.TRAIN.EPOCH_COUNT
-    dls = data.build_dataloaders(cfg, datasets, selective=False)
+    selective = cfg.TRAIN.SELECTIVE_BP <= 1. - 1e-6
+    dls = data.build_dataloaders(cfg, datasets, selective=selective)
     model, opt = build_model(cfg)
 
-    criterion = clo
-    train_cb = TrainCB(logger=logger)
+    criterion = partial(clo, reduction=('none' if selective else 'mean'))
+    train_cb = TrainCB(logger=logger) if not selective else SelectiveTrainCB(logger=logger)
     val_cb = ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
@@ -74,9 +75,10 @@ def start_fold(cfg, output_folder, datasets):
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
     l0,l1,l2 = 5e-5, 2e-4,5e-5
-    scale = 1 / 6 #cfg.PARALLEL.WORLD_SIZE
+    scale = 1/4  #cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale
+    #l0,l1,l2 = l0, l1/scale, l2
     lr_cos_sched = sh.schedulers.combine_scheds([
         [.025, sh.schedulers.sched_cos(l0,l1)],
         [.975, sh.schedulers.sched_cos(l1,l2)]])

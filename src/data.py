@@ -194,17 +194,13 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 def build_dataloader(cfg, dataset, mode, selective):
     drop_last = False
-
-    bs = cfg[mode]['BATCH_SIZE']
-    num_workers = cfg.TRAIN.NUM_WORKERS
-    
     sampler = None 
+
     if selective:
-        _s = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
-        indxs = list(_s)
-        dataset = FoldDataset(dataset, indxs)
+        #_s = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
+        #indxs = list(_s)
+        #dataset = FoldDataset(dataset, indxs)
         weights = torch.ones(len(dataset))
-        #weights[:int(len(dataset)*.2)] *= 100 
         sampler = SelectiveSampler(weights) 
 
     if cfg.PARALLEL.DDP and mode == 'TRAIN':
@@ -215,9 +211,9 @@ def build_dataloader(cfg, dataset, mode, selective):
 
     dl = DataLoader(
         dataset,
-        batch_size=bs,
+        batch_size=cfg[mode]['BATCH_SIZE'],
         shuffle=shuffle,
-        num_workers=num_workers,
+        num_workers=0,#cfg.TRAIN.NUM_WORKERS,
         pin_memory=True,
         drop_last=drop_last,
         collate_fn=None,

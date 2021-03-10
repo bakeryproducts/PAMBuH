@@ -38,7 +38,7 @@ class SelectiveSampler(Sampler):
     def __init__(self, weights, num_draw=1.):
         if isinstance(num_draw, float): num_draw = int(num_draw * len(weights))
         self.sampler = WeightedRandomSampler(weights, num_draw , replacement=False)
-        self.alpha = .7
+        self.alpha = .95
                  
     def __iter__(self):
         self.dataset = DatasetFromSampler(self.sampler)
@@ -49,8 +49,6 @@ class SelectiveSampler(Sampler):
     def set_weights(self, ws): 
         for w, idx in zip(ws, self.dataset.sampler_list):
             self.sampler.weights[idx] = w*self.alpha + (1-self.alpha)*self.sampler.weights[idx]
-
-        #self.sampler.weights = self._reorder(ws)
     
     def _reorder(self, ws):
         return torch.tensor([x for _,x in sorted(zip(self.dataset.sampler_list, ws), reverse=False)], dtype=torch.float)

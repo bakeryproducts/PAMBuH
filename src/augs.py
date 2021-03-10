@@ -57,7 +57,7 @@ class Augmentator:
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
 
     def aug_light_scale(self): return self.compose([self.scale(), self.multi_crop(), albu.Flip(), albu.RandomRotate90(), self.color_jit(), self.blur(), self.norm()])
-    def aug_light(self): return self.compose([self.multi_crop(), albu.Flip(), albu.RandomRotate90(), self.norm()])
+    def aug_light(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w, p=1), albu.Flip(), albu.RandomRotate90(), self.norm()])
 
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])

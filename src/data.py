@@ -99,23 +99,11 @@ def init_datasets(cfg):
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     
     DATASETS = {
-        "train1024x05": SegmentDataset(DATA_DIR/'SPLITS/split1024x05/train/imgs', DATA_DIR/'SPLITS/split1024x05/train/masks'),
-        "val1024x05": SegmentDataset(DATA_DIR/'SPLITS/split1024x05/val/imgs', DATA_DIR/'SPLITS/split1024x05/val/masks'),
-        "backs_30_1024": SegmentDataset(DATA_DIR/'backs030/imgs', DATA_DIR/'backs030/masks'),
-
         "full1024x25": SegmentDataset(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25//masks'),
         "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
         "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
-        "val2_1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val2/imgs', DATA_DIR/'SPLITS/split1024x25/val2/masks'),
-        "backs_30_x25_1024": SegmentDataset(DATA_DIR/'backs030_x25/imgs', DATA_DIR/'backs030_x25/masks'),
+        "backs_20_x25_1024": SegmentDataset(DATA_DIR/'backs020_x25/imgs', DATA_DIR/'backs020_x25/masks'),
 
-        "train1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
-        "val1024x25gray": SegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/val/imgs', DATA_DIR/'SPLITS/split1024x25_gray/val/masks'),
-        "backs_30_x25_1024gray": SegmentDataset(DATA_DIR/'backs030_x25_gray/imgs', DATA_DIR/'backs030_x25_gray/masks'),
-
-        "train1024x25grayTTT": TagSegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/train/imgs', DATA_DIR/'SPLITS/split1024x25_gray/train/masks'),
-        "val1024x25grayTTT": TagSegmentDataset(DATA_DIR/'SPLITS/split1024x25_gray/val/imgs', DATA_DIR/'SPLITS/split1024x25_gray/val/masks'),
-        "backs_30_x25_1024grayTTT": TagSegmentDataset(DATA_DIR/'backs030_x25_gray/imgs', DATA_DIR/'backs030_x25_gray/masks'),
     }
     return  DATASETS
 
@@ -213,7 +201,7 @@ def build_dataloader(cfg, dataset, mode, selective):
         dataset,
         batch_size=cfg[mode]['BATCH_SIZE'],
         shuffle=shuffle,
-        num_workers=0,#cfg.TRAIN.NUM_WORKERS,
+        num_workers=cfg.TRAIN.NUM_WORKERS,
         pin_memory=True,
         drop_last=drop_last,
         collate_fn=None,

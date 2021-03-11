@@ -246,7 +246,7 @@ def autocaster(foo, *args, **kwargs):
 def init_model(model):
     for m in model.modules():
         if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-            if m.in_channels == 3: nn.init.normal_(m.weight, 0, 0.07)
+            if m.in_channels == 3: nn.init.normal_(m.weight, 0, 0.21)
             if isinstance(m, nn.Conv2d) : nn.init.kaiming_uniform_(m.weight, a=.1, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, nn.ConvTranspose2d): nn.init.kaiming_uniform_(m.weight, a=.1, mode='fan_in', nonlinearity='leaky_relu')#nn.init.xavier_uniform_(m.weight, 0.1)
             if m.bias is not None: m.bias.data.zero_()
@@ -273,8 +273,8 @@ def tencent_trick(model):
 
 
 def model_select():
-    #return Unet
-    return NestedUNet
+    return Unet
+    #return NestedUNet
     #return att_unet
 
 def build_model(cfg):

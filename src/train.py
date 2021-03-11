@@ -19,7 +19,7 @@ from callbacks import *
 
 
 def clo(logits, predicts, reduction='none'):
-    w1 = .33
+    w1 = .2
     w2 = 1 - w1 
     l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
     l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts, reduction=reduction)
@@ -75,7 +75,7 @@ def start_fold(cfg, output_folder, datasets):
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
     l0,l1,l2 = 5e-5, 2e-4,5e-5
-    scale = 1/4  #cfg.PARALLEL.WORLD_SIZE
+    scale = 1/2  #cfg.PARALLEL.WORLD_SIZE
 
     l0,l1,l2 = l0/scale, l1/scale, l2/scale
     #l0,l1,l2 = l0, l1/scale, l2

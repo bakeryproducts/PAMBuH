@@ -3,11 +3,11 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['full1024x25', 'backs_30_x25_1024']
+    DATASETS: ['train1024x25', 'backs_20_x25_1024']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
-    MULTIPLY: {'rate':10}
+    MULTIPLY: {'rate':4}
   VALID:
     DATASETS: ['val1024x25']
     PRELOAD: False
@@ -30,7 +30,7 @@ TRANSFORMERS:
 
 TRAIN:
   DOWNSCALE: 4
-  NUM_FOLDS: 4
+  NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   AMP: True
   GPUS: [0,1,2,3]
@@ -38,12 +38,12 @@ TRAIN:
   
   SAVE_STEP: .4
   SCALAR_STEP: 1
-  TB_STEP: 20
+  TB_STEP: 10
   
   EPOCH_COUNT: 500
   BATCH_SIZE: 64
 VALID:
-  STEP: 20
+  STEP: 10
   BATCH_SIZE: 32
 TEST:
   BATCH_SIZE: 1

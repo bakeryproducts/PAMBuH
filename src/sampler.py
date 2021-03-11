@@ -58,8 +58,13 @@ class GdalSampler:
                             self._polygons_centroid[idx][1]+y_shift, * self._img_wh)
         window_mask = Window(self._polygons_centroid[idx][0]+x_shift,
                              self._polygons_centroid[idx][1]+y_shift, * self._mask_wh)
-        img = self._img.read(self._bands_img, window=window_img)
-        mask = self._mask.read(self._bands_mask, window=window_mask)
+
+        # TODO ?
+        # if shift: x+=get_shift(), y+=get_shift()
+        #self._img.read(((x,x+w),(y,y+h)))
+        
+        img = self._img.read(window=window_img)
+        mask = self._mask.read(window=window_mask)
         return img, mask
 
     def __del__(self):
@@ -161,8 +166,9 @@ class BackgroundSampler:
         window_img = Window(x_off_img, y_off_img, *self._img_wh)
         window_mask = Window(x_off_mask, y_off_mask, *self._mask_wh)
 
-        img = self._img.read(self._bands_img, window=window_img, boundless=self._boundless)
-        mask = self._mask.read(self._bands_mask, window=window_mask, boundless=self._boundless)
+
+        img = self._img.read(window=window_img, boundless=self._boundless)
+        mask = self._mask.read(window=window_mask, boundless=self._boundless)
         return img, mask
 
     def __del__(self):

@@ -170,6 +170,10 @@ def tiff_merge_mask(path_tiff, path_mask, path_dst, path_mask2=None):
     mask = rasterio.open(path_mask).read()
     assert mask.max() <= 1 + 1e-6
 
+    if img.shape[0] == 1:
+        img = np.repeat(img, 3, 0)
+
+
     img[1,...] = img.mean(0)
     img[0,...] = mask*200
 

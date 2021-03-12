@@ -273,8 +273,8 @@ def tencent_trick(model):
 
 
 def model_select():
-    return Unet
-    #return NestedUNet
+    #return Unet
+    return NestedUNet
     #return att_unet
 
 def build_model(cfg):

@@ -7,10 +7,10 @@ import multiprocessing as mp
 from functools import partial
 
 import cv2
-import pandas as pd
 import numpy as np
-import rasterio as rio
+import pandas as pd
 from tqdm import tqdm
+import rasterio as rio
 
 import utils
 import rle2tiff
@@ -19,7 +19,7 @@ import warnings
 warnings.filterwarnings("ignore", category=rio.errors.NotGeoreferencedWarning)
 
 
-def _count_blocks(dims, block_size=(256, 256)):
+def _count_blocks(dims, block_size):
     nXBlocks = (int)((dims[0] + block_size[0] - 1) / block_size[0])
     nYBlocks = (int)((dims[1] + block_size[1] - 1) / block_size[1])
     return nXBlocks, nYBlocks
@@ -28,7 +28,7 @@ def get_basics_rasterio(name):
     file = rio.open(str(name))
     return file, file.shape, file.count
 
-def generate_block_coords(H, W, block_size=(128,128)):
+def generate_block_coords(H, W, block_size):
     h,w = block_size
     nYBlocks = (int)((H + h - 1) / h)
     nXBlocks = (int)((W + w - 1) / w)
@@ -40,12 +40,13 @@ def generate_block_coords(H, W, block_size=(128,128)):
             yield cy, cx, h, w
 
             
-def get_shift_center(block, h,w): return block.shape[1]//2 -h//2, block.shape[2]//2 -w//2
-def pad_block(y,x,h,w, pad): return np.array([y-pad, x-pad, h+pad, w+pad])
+def pad_block(y,x,h,w, pad): return np.array([y-pad, x-pad, h+2*pad, w+2*pad])
 def crop(src, y,x,h,w): return src[..., y:y+h, x:x+w]
-def crop_rio(p, y,x,h,w, bands=(1,2,3)):
+def crop_rio(p, y,x,h,w):
     ds = rio.open(p)
-    block = ds.read(bands, window=((y,y+h),(x,x+w)), boundless=True)
+    block = ds.read(window=((y,y+h),(x,x+w)), boundless=True)
+    #print('cd: ', y,x,h,w)
+    #print('read: ', block.shape)
     ds.close()
     del ds
     return block
@@ -54,20 +55,19 @@ def paste(src, block, y,x,h,w):src[..., y:y+h, x:x+w] = block
 def paste_crop(src, part, block_cd, pad):
     _,H,W = src.shape
     y,x,h,w = block_cd
-    
     h, w = min(h, H-y), min(w, W-x)  
     part = crop(part, pad, pad, h, w)
     paste(src, part, *block_cd)
 
 def infer_blocks(blocks, do_inference):
     blocks = do_inference(blocks).cpu().numpy()    
-    blocks = (255*blocks).astype(np.uint8)
-    return blocks
+    return (255*blocks).astype(np.uint8)
  
 def image_q_reader(q, p, cds, pad):
     for block_cd in cds:
         padded_block_cd = pad_block(*block_cd, pad)
         block = crop_rio(p, *(padded_block_cd))
+        if block.shape[0] == 1: block = np.repeat(block, 3, 0)
         q.put((block, block_cd))
         
 def mask_q_writer(q, H, W, total_blocks, root, pad, result):
@@ -78,25 +78,17 @@ def mask_q_writer(q, H, W, total_blocks, root, pad, result):
     batch = []
     
     while count < total_blocks:
-        try:
-            if len(batch) == BATCH_SIZE:
-                #print('Drop batch', len(batch))
-                blocks = [b[0] for b in batch]
-                block_cds = [b[1] for b in batch]
+        if len(batch) == BATCH_SIZE:
+            blocks = [b[0] for b in batch]
+            block_cds = [b[1] for b in batch]
 
-                block_masks = infer_blocks(blocks, do_inference)
-                [paste_crop(mask, block_mask, block_cd, pad) for block_mask, block_cd, block in zip(block_masks, block_cds, blocks) if block.mean() > 0]
-                batch = []
-            else:
-                batch.append(q.get())
-                count+=1
-                q.task_done()
-        except mp.TimeoutError:
-            print("timeout, quit.")
-            break
-        except Exception as e:
-            print(e)
-            break
+            block_masks = infer_blocks(blocks, do_inference)
+            [paste_crop(mask, block_mask, block_cd, pad) for block_mask, block_cd, block in zip(block_masks, block_cds, blocks)]
+            batch = []
+        else:
+            batch.append(q.get())
+            count+=1
+            q.task_done()
 
     if batch:
         blocks = [b[0] for b in batch]
@@ -112,7 +104,7 @@ def mask_q_writer(q, H, W, total_blocks, root, pad, result):
 def mp_func_wrapper(func, args): return func(*args)
 def chunkify(l, n): return [l[i:i + n] for i in range(0, len(l), n)]
 
-def launch_mpq(img_name, model_folder, block_size=512, pad=16, num_processes=1, qsize=24):
+def launch_mpq(img_name, model_folder, block_size, pad, num_processes, qsize):
     m = mp.Manager()
     result = m.dict()
     q = m.Queue(maxsize=qsize)
@@ -143,34 +135,12 @@ def filter_mask(mask, name):
         data = json.load(f)
     h,w = mask.shape
     cortex_rec = [r for r in data if r['properties']['classification']['name'] == 'Cortex']
-    cortex_poly = np.array(cortex_rec[0]['geometry']['coordinates'])
+    cortex_poly = np.array(cortex_rec[0]['geometry']['coordinates']).astype(np.int32)
     buf = np.zeros((h,w), dtype=np.uint8)
-    cv2.fillPoly(buf, np.array(cortex_poly), 1)
+    cv2.fillPoly(buf, cortex_poly, 1)
     mask = mask * buf
     return mask
 
-def global_shift_mask(name, maskpred1):
-    """
-    applies a global shift to a mask by padding one side and cropping from the other
-    """
-    TARGET_ID = 'afa5e8098'
-    y_shift = -40
-    x_shift = -24
-    if name != TARGET_ID: return maskpred1
-
-    if y_shift <0 and x_shift >=0:
-        maskpred2 = np.pad(maskpred1, [(0,abs(y_shift)), (abs(x_shift), 0)], mode='constant', constant_values=0)
-        maskpred3 = maskpred2[abs(y_shift):, :maskpred1.shape[1]]
-    elif y_shift >=0 and x_shift <0:
-        maskpred2 = np.pad(maskpred1, [(abs(y_shift),0), (0, abs(x_shift))], mode='constant', constant_values=0)
-        maskpred3 = maskpred2[:maskpred1.shape[0], abs(x_shift):]
-    elif y_shift >=0 and x_shift >=0:
-        maskpred2 = np.pad(maskpred1, [(abs(y_shift),0), (abs(x_shift), 0)], mode='constant', constant_values=0)
-        maskpred3 = maskpred2[:maskpred1.shape[0], :maskpred1.shape[1]]
-    elif y_shift < 0 and x_shift < 0:
-        maskpred2 = np.pad(maskpred1, [(0, abs(y_shift)), (0, abs(x_shift))], mode='constant', constant_values=0)
-        maskpred3 = maskpred2[abs(y_shift):, abs(x_shift):]
-    return maskpred3
 
 if __name__ == '__main__':
     os.environ['CPL_LOG'] = '/dev/null'
@@ -178,17 +148,16 @@ if __name__ == '__main__':
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
     #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    #model_folder = 'output/2021_Feb_23_17_04_53_PAMBUH/'
-    #model_folder = 'output/2021_Feb_24_23_21_13_PAMBUH/'
-    #model_folder = 'output/2021_Feb_27_00_37_10_PAMBUH/'
-    model_folder = 'output/2021_Feb_27_21_00_22_PAMBUH/'
+    model_folder = 'output/2021_Mar_11_17_49_44_PAMBUH/'
+    #model_folder = 'output/2021_Mar_11_23_19_45_PAMBUH/'
+    
 
     block_size = 2048
-    pad = 512
-    threshold = 160
+    pad = 1024
+    threshold = 127
     num_processes = 8
-    qsize = 16
-    save_predicts = False
+    qsize = 24
+    save_predicts = True
     join_predicts = True
 
 
@@ -205,7 +174,6 @@ if __name__ == '__main__':
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=num_processes, qsize=qsize)
         #mask = filter_mask(mask, img_name)
         mask[mask<threshold] = 0
-        mask = global_shift_mask(img_name.stem, mask)
 
         if save_predicts:
             out_name = dst/'masks'/img_name.name
@@ -218,7 +186,7 @@ if __name__ == '__main__':
         mask = mask.clip(0,1)
         rle = rle2tiff.mask2rle(mask)
         df.loc[img_name.stem] = rle
-        #break
+        break
 
     df.to_csv(model_folder + 'submission.csv')
     

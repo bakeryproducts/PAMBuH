@@ -19,7 +19,7 @@ from callbacks import *
 
 
 def clo(logits, predicts, reduction='none'):
-    w1 = .2
+    w1 = 0
     w2 = 1 - w1 
     l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
     l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts, reduction=reduction)

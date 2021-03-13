@@ -1,9 +1,11 @@
-from PIL import Image
-from shapely import geometry
-from typing import List, Tuple
 import random 
 import numpy as np
+from PIL import Image
+from typing import List, Tuple
+from functools import partial
+
 import rasterio
+from shapely import geometry
 from rasterio.windows import Window
 
 from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist, get_cortex_polygons, gen_pt_in_poly
@@ -82,7 +84,6 @@ class BackgroundSampler:
                  mask_path: str,
                  polygons: List[geometry.Polygon],
                  img_wh: Tuple[int, int],
-                 mask_wh: Tuple[int, int],
                  num_samples: int,
                  step: int = 25,
                  max_trials: int = 25,
@@ -98,28 +99,27 @@ class BackgroundSampler:
             polygons = utils.get_cortex_polygons(utils.jread(img_anot_struct_path))
         """
 
-        assert img_wh == mask_wh, "Image and mask wh should be identical"
         self._mask = rasterio.open(mask_path)
+        self.mask_path = mask_path
         self._img = rasterio.open(img_path)
-        self._polygons = polygons
-        self._img_wh = img_wh
-        self._mask_wh = mask_wh
+        self._polygons = [poly.buffer(buffer_dist) for poly in polygons] if polygons else None # Dilate if any
+        self._w, self._h = img_wh
         self._num_samples = num_samples
         self._mask_glom_val = mask_glom_val
-        self._buffer_dist = buffer_dist
-        self._bands_img = (1, 2, 3)
-        self._bands_mask = 1
         self._boundless = True
         self._count = -1
         self._step = step
         self._max_trials = max_trials
 
         # Read rasterio mask
-        mask_arr = self._mask.read(self._bands_mask)
-        # Dilate polygs
-        self._polygons = [polyg.buffer(self._buffer_dist) for polyg in self._polygons]
+        mask_arr = self._mask.read()
         # Get list of centroids
         self._centroids = [self.gen_backgr_pt(mask_arr) for _ in range(num_samples)]
+
+    def gen_pt_in_img(self):
+        W,H = self._img.shape
+        pt  = np.random.random() * W + self._w, np.random.random() * H + self._h # lazy
+        return pt
 
     def gen_backgr_pt(self, mask_arr: np.ndarray) -> Tuple[int, int]:
         """Generates background point.
@@ -129,13 +129,17 @@ class BackgroundSampler:
 
         glom_presence_in_backgr, trial = 0, 0
 
+        gen = partial(gen_pt_in_poly, random.choice(self._polygons)) if self._polygons is not None else self.gen_pt_in_img
+
         while True:
-            polygon = random.choice(self._polygons)
-            rand_pt = gen_pt_in_poly(polygon)
+            rand_pt = gen()
             x_cent, y_cent = np.array(rand_pt).astype(int)
-            x_off, y_off = x_cent - self._mask_wh[0] // 2, y_cent - self._mask_wh[1] // 2
+            x_off, y_off = x_cent - self._w // 2, y_cent - self._h // 2
             # Reverse x and y, because gdal return C H W
-            sample_mask = mask_arr[y_off: y_off+self._mask_wh[1], x_off: x_off+self._mask_wh[0]]
+
+            window= Window(x_off, y_off, self._w, self._h)
+            sample_mask = self._mask.read(window=window, boundless=self._boundless)
+            #trial += 1 ?
 
             if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
                 return x_cent, y_cent
@@ -157,18 +161,12 @@ class BackgroundSampler:
             raise StopIteration("Failed to proceed to the next step")
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        x_off_img = self._centroids[idx][0] - self._img_wh[0] // 2
-        y_off_img = self._centroids[idx][1] - self._img_wh[1] // 2
+        x_off= self._centroids[idx][0] - self._w // 2
+        y_off= self._centroids[idx][1] - self._h // 2
 
-        x_off_mask = self._centroids[idx][0] - self._mask_wh[0] // 2
-        y_off_mask = self._centroids[idx][1] - self._mask_wh[1] // 2
-
-        window_img = Window(x_off_img, y_off_img, *self._img_wh)
-        window_mask = Window(x_off_mask, y_off_mask, *self._mask_wh)
-
-
-        img = self._img.read(window=window_img, boundless=self._boundless)
-        mask = self._mask.read(window=window_mask, boundless=self._boundless)
+        window= Window(x_off, y_off, self._w, self._h)
+        img = self._img.read(window=window, boundless=self._boundless)
+        mask = self._mask.read(window=window, boundless=self._boundless)
         return img, mask
 
     def __del__(self):

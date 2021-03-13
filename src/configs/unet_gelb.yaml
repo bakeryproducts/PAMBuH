@@ -3,7 +3,7 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['full1024x25', 'backs_20_x25_1024']
+    DATASETS: ['train1024x25', 'backs_20_x25_1024']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
@@ -30,10 +30,10 @@ TRANSFORMERS:
 
 TRAIN:
   DOWNSCALE: 4
-  NUM_FOLDS: 4
+  NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   AMP: True
-  GPUS: [0,1,2,3]
+  GPUS: [1,2,3]
   NUM_WORKERS: 8
   
   SAVE_STEP: .4

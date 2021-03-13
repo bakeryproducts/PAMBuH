@@ -67,7 +67,7 @@ def image_q_reader(q, p, cds, pad):
     for block_cd in cds:
         padded_block_cd = pad_block(*block_cd, pad)
         block = crop_rio(p, *(padded_block_cd))
-        if block.shape[0] == 1: block = np.repeat(block, 3, 0)
+        #if block.shape[0] == 1: block = np.repeat(block, 3, 0)
         q.put((block, block_cd))
         
 def mask_q_writer(q, H, W, total_blocks, root, pad, result):
@@ -148,13 +148,13 @@ if __name__ == '__main__':
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
     #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    model_folder = 'output/2021_Mar_11_17_49_44_PAMBUH/'
-    #model_folder = 'output/2021_Mar_11_23_19_45_PAMBUH/'
+    model_folder = 'output/2021_Mar_13_14_52_10_PAMBUH/'
+    #model_folder = 'output/2021_Mar_13_00_27_34_PAMBUH'
     
 
     block_size = 2048
-    pad = 1024
-    threshold = 127
+    pad = 512
+    threshold = 160
     num_processes = 8
     qsize = 24
     save_predicts = True
@@ -172,7 +172,7 @@ if __name__ == '__main__':
         #img_name = img_names[-2]
         print(f'Creating mask for {img_name}')
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=num_processes, qsize=qsize)
-        #mask = filter_mask(mask, img_name)
+        mask = filter_mask(mask, img_name)
         mask[mask<threshold] = 0
 
         if save_predicts:
@@ -186,7 +186,7 @@ if __name__ == '__main__':
         mask = mask.clip(0,1)
         rle = rle2tiff.mask2rle(mask)
         df.loc[img_name.stem] = rle
-        break
+        #break
 
     df.to_csv(model_folder + 'submission.csv')
     

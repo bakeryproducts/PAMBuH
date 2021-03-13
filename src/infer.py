@@ -58,7 +58,7 @@ def preprocess_image(img, scale, transform):
     ch, H,W, dtype = *img.shape, img.dtype
     assert ch==3 and dtype==np.uint8
     img = img.transpose(1,2,0)
-    img = cv2.resize(img, (W // scale, H // scale))
+    img = cv2.resize(img, (W // scale, H // scale), interpolation=cv2.INTER_AREA)
     return transform(image=img)['image']
 
 def _infer_func(imgs, transform, scale, model):

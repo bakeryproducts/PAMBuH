@@ -250,7 +250,8 @@ def init_model(model):
             if isinstance(m, nn.Conv2d) : nn.init.kaiming_uniform_(m.weight, a=.1, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, nn.ConvTranspose2d): nn.init.kaiming_uniform_(m.weight, a=.1, mode='fan_in', nonlinearity='leaky_relu')#nn.init.xavier_uniform_(m.weight, 0.1)
             if m.bias is not None: m.bias.data.zero_()
-    model._layer_init()
+    if hasattr(model, '_layer_init'):
+        model._layer_init()
 
 
 def tencent_trick(model):
@@ -273,16 +274,20 @@ def tencent_trick(model):
 
 
 def model_select():
-    #return Unet
-    return NestedUNet
-    #return att_unet
+    #model = Unet
+    #model = NestedUNet
+    import segmentation_models_pytorch as smp
+    model = smp.manet.MAnet
+    return model
 
 def build_model(cfg):
     base_lr = 1e-4# should be overriden in LR scheduler anyway
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
-    model = model_select()(in_channels=3, out_channels=1)
-    init_model(model)
+    model = model_select()()
+    #init_model(model)
+    #model = smp.manet.MAnet(encoder_name='resnext50_32x4d')#, encoder_depth=4, decoder_channels=[256,128,32,16])
+    #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
     model = model.cuda()
     
     opt = optim.AdamW
@@ -297,7 +302,7 @@ def build_model(cfg):
 
 def load_model(cfg, path):
     # model_select syncing build and load, probably should be in cfg, by key as in datasets
-    model = model_select()(in_channels=3, out_channels=1)
+    model = model_select()(in_channels=3)
     
     state_dict = torch.load(path)['model_state']
     # Strip ddp model TODO dont save it like that

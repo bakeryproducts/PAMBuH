@@ -148,14 +148,16 @@ if __name__ == '__main__':
 
     #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
     #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    model_folder = 'output/2021_Mar_13_14_52_10_PAMBUH/'
-    #model_folder = 'output/2021_Mar_13_00_27_34_PAMBUH'
+    #model_folder = 'output/2021_Mar_13_14_52_10_PAMBUH/'
+    #model_folder = 'output/2021_Mar_13_00_27_34_PAMBUH/'
+    #model_folder = 'output/2021_Mar_14_00_27_22_PAMBUH/'
+    model_folder = 'output/2021_Mar_14_22_25_43_PAMBUH/'
     
 
     block_size = 2048
     pad = 512
     threshold = 160
-    num_processes = 8
+    num_processes = 16
     qsize = 24
     save_predicts = True
     join_predicts = True
@@ -169,10 +171,10 @@ if __name__ == '__main__':
     print(list(img_names))
 
     for img_name in img_names:
-        #img_name = img_names[-2]
+        #img_name = img_names[1]
         print(f'Creating mask for {img_name}')
         mask = launch_mpq(str(img_name), model_folder, block_size=block_size, pad=pad, num_processes=num_processes, qsize=qsize)
-        mask = filter_mask(mask, img_name)
+        #mask = filter_mask(mask, img_name)
         mask[mask<threshold] = 0
 
         if save_predicts:

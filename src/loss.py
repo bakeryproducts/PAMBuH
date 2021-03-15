@@ -47,6 +47,8 @@ def focal_loss(outputs: torch.Tensor, targets: torch.Tensor, gamma: float = 2.0,
 
     return loss
 
+def symmetric_lovasz(outputs, targets):
+    return 0.5*(lovasz_hinge(outputs, targets) + lovasz_hinge(-outputs, 1.0 - targets))
 
 def lovasz_grad(gt_sorted):
     """
@@ -77,7 +79,7 @@ def iou_binary(preds, labels, EMPTY=1., ignore=None, per_image=True):
         if not union:
             iou = EMPTY
         else:
-            iou = float(intersection) / float(union)
+            iou = float(intersection) / union
         ious.append(iou)
     iou = mean(ious)    # mean accross images if per_image
     return 100 * iou
@@ -99,16 +101,16 @@ def iou(preds, labels, C, EMPTY=1., ignore=None, per_image=False):
                 if not union:
                     iou.append(EMPTY)
                 else:
-                    iou.append(float(intersection) / float(union))
+                    iou.append(float(intersection) / union)
         ious.append(iou)
-    ious = [mean(iou) for iou in zip(*ious)] # mean accross images if per_image
+    ious = map(mean, zip(*ious)) # mean accross images if per_image
     return 100 * np.array(ious)
 
 
 # --------------------------- BINARY LOSSES ---------------------------
 
 
-def lovasz_hinge(logits, labels, ignore=None, reduction='none'):
+def lovasz_hinge(logits, labels, per_image=True, ignore=None):
     """
     Binary Lovasz hinge loss
       logits: [B, H, W] Variable, logits at each pixel (between -\infty and +\infty)
@@ -116,8 +118,11 @@ def lovasz_hinge(logits, labels, ignore=None, reduction='none'):
       per_image: compute the loss per image instead of per batch
       ignore: void class id
     """
-    loss = [lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore)) for log, lab in zip(logits, labels)]
-    if reduction == 'mean': loss = mean(loss)
+    if per_image:
+        loss = mean(lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore))
+                          for log, lab in zip(logits, labels))
+    else:
+        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore))
     return loss
 
 
@@ -137,7 +142,8 @@ def lovasz_hinge_flat(logits, labels):
     perm = perm.data
     gt_sorted = labels[perm]
     grad = lovasz_grad(gt_sorted)
-    loss = torch.dot(F.relu(errors_sorted), Variable(grad))
+    #loss = torch.dot(F.relu(errors_sorted), Variable(grad))
+    loss = torch.dot(F.elu(errors_sorted)+1, Variable(grad))
     return loss
 
 
@@ -176,7 +182,9 @@ def binary_xloss(logits, labels, ignore=None):
     loss = StableBCELoss()(logits, Variable(labels.float()))
     return loss
 
-def isnan(x): return x != x
+
+
+# --------------------------- HELPER FUNCTIONS ---------------------------
 
 def mean(l, ignore_nan=False, empty=0):
     """
@@ -184,7 +192,7 @@ def mean(l, ignore_nan=False, empty=0):
     """
     l = iter(l)
     if ignore_nan:
-        l = ifilterfalse(isnan, l)
+        l = ifilterfalse(np.isnan, l)
     try:
         n = 1
         acc = next(l)
@@ -197,4 +205,3 @@ def mean(l, ignore_nan=False, empty=0):
     if n == 1:
         return acc
     return acc / n
-

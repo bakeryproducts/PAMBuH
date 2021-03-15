@@ -40,6 +40,25 @@ class SegmentDataset:
         self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
         self.mode_train = mode_train
         
+        DOUBLE_HARD = True
+        self.img_domains = {  
+                         '4ef6695ce': 1,
+                         'b9a3865fc': 0,
+                         'e79de561c': 1,
+                         '8242609fa': 0,
+                         'cb2d976f4': 0,
+                         '26dc41664': 1,
+                         'b2dc8411c': 0,
+                         'afa5e8098': 1,
+                         '0486052bb': 0,
+                         '1e2425f28': 1,
+                         'c68fe75ea': 1,
+                         'aaa6a05cc': 0,
+                         '54f2eec69': 1,
+                         '095bf7a1f': 1,
+                         '2f6ecfcdf': 0,
+                         }
+        
         dss = []
         for imgf, maskf in zip(self.img_folders, self.masks_folders):
             ids = ImageDataset(imgf, '*.png')
@@ -47,7 +66,10 @@ class SegmentDataset:
             if self.mode_train:
                 ids.process_item = expander
                 mds.process_item = expander_float
-            dss.append(PairDataset(ids, mds))
+            dataset = PairDataset(ids, mds)
+            if DOUBLE_HARD and self.img_domains[imgf.name]:
+                dataset = MultiplyDataset(dataset, 2)
+            dss.append(dataset)
         
         self.dataset = ConcatDataset(dss)
     
@@ -99,10 +121,19 @@ def init_datasets(cfg):
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     
     DATASETS = {
-        "full1024x25": SegmentDataset(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25//masks'),
+        "full1024x25": SegmentDataset(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25/masks'),
         "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
         "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
         "backs_20_x25_1024": SegmentDataset(DATA_DIR/'backs020_x25/imgs', DATA_DIR/'backs020_x25/masks'),
+        "backs_10_x25_1024_cortex": SegmentDataset(DATA_DIR/'backs010_x25_cortex/imgs', DATA_DIR/'backs010_x25_cortex/masks'),
+
+        "full2048x25": SegmentDataset(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
+        "train2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
+        "val2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
+
+        "train1024x5": SegmentDataset(DATA_DIR/'SPLITS/split1024x5/train/imgs', DATA_DIR/'SPLITS/split1024x5/train/masks'),
+        "val1024x5": SegmentDataset(DATA_DIR/'SPLITS/split1024x5/val/imgs', DATA_DIR/'SPLITS/split1024x5/val/masks'),
+        "backs_10_x5_1024": SegmentDataset(DATA_DIR/'backs010_x5/imgs', DATA_DIR/'backs010_x5/masks'),
 
     }
     return  DATASETS

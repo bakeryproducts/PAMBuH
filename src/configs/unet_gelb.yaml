@@ -3,13 +3,13 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train1024x25', 'backs_20_x25_1024']
+    DATASETS: ['train2048x25', 'backs_20_x25_1024', 'backs_10_x25_1024_cortex']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
-    MULTIPLY: {'rate':4}
+    MULTIPLY: {'rate':2}
   VALID:
-    DATASETS: ['val1024x25']
+    DATASETS: ['val2048x25']
     PRELOAD: False
   VALID2:
     PRELOAD: False
@@ -25,22 +25,30 @@ TRANSFORMERS:
     AUG: 'val'
   TEST:
     AUG: 'test'
-  CROP: [128, 128]
-  RESIZE: [128, 128]
+  CROP: [256,256]
+  RESIZE: [256,256]
+  MEAN:
+  - 0.6226
+  - 0.4284
+  - 0.6705
+  STD:
+  - 0.1246
+  - 0.1719
+  - 0.0956
 
 TRAIN:
   DOWNSCALE: 4
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   AMP: True
-  GPUS: [1,2,3]
+  GPUS: [0,1,2,3]
   NUM_WORKERS: 8
   
-  SAVE_STEP: .4
+  SAVE_STEP: .3
   SCALAR_STEP: 1
   TB_STEP: 10
   
-  EPOCH_COUNT: 500
+  EPOCH_COUNT: 200
   BATCH_SIZE: 64
 VALID:
   STEP: 10

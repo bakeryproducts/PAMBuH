@@ -52,7 +52,7 @@ def get_last_model(src):
     return models[idx]
 
 def rescale(batch_img, scale): 
-    return torch.nn.functional.interpolate(batch_img, scale_factor=(scale, scale))
+    return torch.nn.functional.interpolate(batch_img, scale_factor=(scale, scale), mode='bilinear')
 
 def preprocess_image(img, scale, transform):
     ch, H,W, dtype = *img.shape, img.dtype
@@ -64,10 +64,11 @@ def preprocess_image(img, scale, transform):
 def _infer_func(imgs, transform, scale, model):
     batch = [preprocess_image(i, scale, transform) for i in imgs]
     batch = torch.stack(batch,axis=0).cuda()
-    #print(batch.shape, batch.dtype)
+    #print(batch.shape, batch.dtype, batch.max(), batch.min())
     with torch.no_grad():
         res = torch.sigmoid(model(batch))
 
+    #print(res.shape, res.max(), res.min())
     res = rescale(res, scale)
     return res
     
@@ -104,7 +105,15 @@ def get_infer_func(root, use_tta=False):
     transform = cfg_data.norm() 
     model = get_model(root, cfg_data)
     if use_tta: 
-        model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
+        transforms = tta.Compose( [
+                tta.HorizontalFlip(),
+                #tta.VerticalFlip(),
+                tta.Rotate90(angles=[0, 90]),
+                #tta.Scale(scales=[1, .5]),
+                tta.Multiply(factors=[0.9, 1, 1.1]),
+            ])
+        #transforms = tta.aliases.d4_transform()
+        model = tta.SegmentationTTAWrapper(model, transforms, merge_mode='mean')
 
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 

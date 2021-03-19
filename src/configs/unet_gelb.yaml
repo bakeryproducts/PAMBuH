@@ -3,7 +3,7 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train2048x25', 'backs_20_x25_1024', 'backs_10_x25_1024_cortex']
+    DATASETS: ['train2048x25', 'backs_10_x25_2048', 'backs_10_x25_2048_cortex']
     GPU_PRELOAD: False
     PRELOAD: True
     CACHE: False
@@ -12,6 +12,7 @@ DATA:
     DATASETS: ['val2048x25']
     PRELOAD: False
   VALID2:
+    DATASETS: ['val2048x25_hard']
     PRELOAD: False
   TEST:
     DATASETS: []
@@ -40,19 +41,23 @@ TRAIN:
   DOWNSCALE: 4
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
+  DOUBLE_HARD: True
   AMP: True
   GPUS: [0,1,2,3]
-  NUM_WORKERS: 8
+  NUM_WORKERS: 6
   
-  SAVE_STEP: .3
+  SAVE_STEP: .2
   SCALAR_STEP: 1
-  TB_STEP: 10
+  TB_STEP: 5
   
-  EPOCH_COUNT: 200
+  EPOCH_COUNT: 100
   BATCH_SIZE: 64
 VALID:
-  STEP: 10
-  BATCH_SIZE: 32
+  STEP: 5
+  BATCH_SIZE: 16
+VALID2:
+  STEP: 5
+  BATCH_SIZE: 16
 TEST:
   BATCH_SIZE: 1
   

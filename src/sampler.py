@@ -139,7 +139,7 @@ class BackgroundSampler:
 
             window= Window(x_off, y_off, self._w, self._h)
             sample_mask = self._mask.read(window=window, boundless=self._boundless)
-            #trial += 1 ?
+            trial += 1 
 
             if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
                 return x_cent, y_cent

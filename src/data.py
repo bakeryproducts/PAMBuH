@@ -35,12 +35,10 @@ class SegmentDataset:
                     0.png
                     1.png
     '''
-    def __init__(self, imgs_path, masks_path, mode_train=True):
+    def __init__(self, imgs_path, masks_path, mode_train=True, double_hard=False):
         self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
         self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
         self.mode_train = mode_train
-        
-        DOUBLE_HARD = True
         self.img_domains = {  
                          '4ef6695ce': 1,
                          'b9a3865fc': 0,
@@ -67,8 +65,7 @@ class SegmentDataset:
                 ids.process_item = expander
                 mds.process_item = expander_float
             dataset = PairDataset(ids, mds)
-            if DOUBLE_HARD and self.img_domains[imgf.name]:
-                dataset = MultiplyDataset(dataset, 2)
+            if double_hard and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, 2)
             dss.append(dataset)
         
         self.dataset = ConcatDataset(dss)
@@ -119,21 +116,25 @@ def init_datasets(cfg):
     """
     DATA_DIR = Path(cfg.INPUTS).absolute()
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
+    dd = cfg['TRAIN']['DOUBLE_HARD']
+    SD = partial(SegmentDataset, double_hard=dd)
     
     DATASETS = {
-        "full1024x25": SegmentDataset(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25/masks'),
-        "train1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
-        "val1024x25": SegmentDataset(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
-        "backs_20_x25_1024": SegmentDataset(DATA_DIR/'backs020_x25/imgs', DATA_DIR/'backs020_x25/masks'),
-        "backs_10_x25_1024_cortex": SegmentDataset(DATA_DIR/'backs010_x25_cortex/imgs', DATA_DIR/'backs010_x25_cortex/masks'),
+        "full1024x25": SD(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25/masks'),
+        "train1024x25": SD(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
+        "val1024x25": SD(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
+        "backs_20_x25_1024": SD(DATA_DIR/'backs020_x25/imgs', DATA_DIR/'backs020_x25/masks'),
+        "backs_10_x25_2048": SD(DATA_DIR/'backs010_x25/imgs', DATA_DIR/'backs010_x25/masks'),
+        "backs_10_x25_2048_cortex": SD(DATA_DIR/'backs010_x25_cortex/imgs', DATA_DIR/'backs010_x25_cortex/masks'),
 
-        "full2048x25": SegmentDataset(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
-        "train2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
-        "val2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
+        "full2048x25": SD(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
+        "train2048x25": SD(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
+        "val2048x25": SD(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
+        "val2048x25_hard": SD(DATA_DIR/'SPLITS/split2048x25_hard/val/imgs', DATA_DIR/'SPLITS/split2048x25_hard/val/masks'),
 
-        "train1024x5": SegmentDataset(DATA_DIR/'SPLITS/split1024x5/train/imgs', DATA_DIR/'SPLITS/split1024x5/train/masks'),
-        "val1024x5": SegmentDataset(DATA_DIR/'SPLITS/split1024x5/val/imgs', DATA_DIR/'SPLITS/split1024x5/val/masks'),
-        "backs_10_x5_1024": SegmentDataset(DATA_DIR/'backs010_x5/imgs', DATA_DIR/'backs010_x5/masks'),
+        "train1024x5": SD(DATA_DIR/'SPLITS/split1024x5/train/imgs', DATA_DIR/'SPLITS/split1024x5/train/masks'),
+        "val1024x5": SD(DATA_DIR/'SPLITS/split1024x5/val/imgs', DATA_DIR/'SPLITS/split1024x5/val/masks'),
+        "backs_10_x5_1024": SD(DATA_DIR/'backs010_x5/imgs', DATA_DIR/'backs010_x5/masks'),
 
     }
     return  DATASETS
@@ -184,6 +185,7 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
     extend_factories = {
              'PRELOAD':partial(PreloadingDataset, num_proc=num_proc, progress=tqdm),
              'MULTIPLY':MultiplyDataset,
+             'CACHING':CachingDataset,
     }
  
     datasets = create_datasets(cfg, init_datasets(cfg), dataset_types)
@@ -212,7 +214,7 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = False
+    drop_last = True
     sampler = None 
 
     if selective:

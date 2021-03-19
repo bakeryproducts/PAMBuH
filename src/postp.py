@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import json
 import sys
 from pathlib import Path
@@ -146,28 +146,32 @@ if __name__ == '__main__':
     os.environ['CPL_LOG'] = '/dev/null'
     import infer
 
-    #model_folder = 'output/2021_Feb_18_23_33_58_PAMBUH/'
-    #model_folder = 'output/2021_Feb_20_00_13_39_PAMBUH/'
-    #model_folder = 'output/2021_Mar_13_14_52_10_PAMBUH/'
-    #model_folder = 'output/2021_Mar_13_00_27_34_PAMBUH/'
-    #model_folder = 'output/2021_Mar_14_00_27_22_PAMBUH/'
-    model_folder = 'output/2021_Mar_14_22_25_43_PAMBUH/'
+    model_folder = 'output/924/'
+    #model_folder = 'output/2021_Mar_16_23_30_30_PAMBUH/'
+    #model_folder = 'output/2021_Mar_17_13_20_57_PAMBUH/'
+    #model_folder = 'output/2021_Mar_17_18_22_31_PAMBUH/'
+    #model_folder = 'output/2021_Mar_17_23_03_21_PAMBUH/'
+
+    #model_folder = 'output/2021_Mar_18_20_12_51_PAMBUH/'
+    #model_folder = 'output/2021_Mar_18_23_25_33_PAMBUH/'
     
 
     block_size = 2048
-    pad = 512
-    threshold = 160
+    pad = 1024
+    threshold = int(.4 * 255)#105
     num_processes = 16
     qsize = 24
     save_predicts = True
-    join_predicts = True
+    join_predicts = False
 
 
     src = Path('input/hm/test')
+    #src = Path('input/hm/train')
     img_names = src.glob('*.tiff')
     dst = Path('output/predicts')
     df = pd.read_csv('input/hm/sample_submission.csv', index_col='id')
     img_names = list(img_names)
+    img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
     print(list(img_names))
 
     for img_name in img_names:

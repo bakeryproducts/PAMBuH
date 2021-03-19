@@ -1,7 +1,7 @@
 import random
 from PIL import Image
 from pathlib import Path
-from functools import partial, reduce
+from functools import partial, reduce, lru_cache
 from collections import defaultdict
 
 import numpy as np
@@ -71,6 +71,17 @@ class MultiplyDataset:
             _dataset += TorchConcatDataset([dataset])
         self.dataset = _dataset
         
+    def __getitem__(self, idx):
+        return self.dataset.__getitem__(idx)
+    
+    def __len__(self):
+        return len(self.dataset)
+
+class CachingDataset:
+    def __init__(self, dataset):
+        self.dataset = dataset
+            
+    @lru_cache(maxsize=None)
     def __getitem__(self, idx):
         return self.dataset.__getitem__(idx)
     

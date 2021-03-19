@@ -44,16 +44,19 @@ Sasha, do me!
 ```
 _____________
 
-3. Submit is shitty
-    ???
 
 4. pip package
 
 5. COde based:
     - Docker
-    - models separation
+    - Downscale x5
+    - scale problem , .65/.5
+    - multiply hard even more
+    - loss scale
+    - unet + seresnet101
+    - init from model
+    - optimizerS schedule
     - checkout domainhead
-    - crop size from .csv?? 
     - 
 
 

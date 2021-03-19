@@ -1,15 +1,40 @@
 from __future__ import print_function, division
+from functools import partial
 
 import torch
+import numpy as np
 from torch.autograd import Variable
 import torch.nn.functional as F
-import numpy as np
+
 try:
     from itertools import  ifilterfalse
 except ImportError: # py3k
     from itertools import  filterfalse as ifilterfalse
 
-
+class EdgeLoss:
+    def __init__(self, gpu=True):
+        device = 'cuda' if gpu else 'cpu'
+        self.get_edge_1 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,3,3).to(device)/9, padding=1)
+        self.get_edge_2 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,7,7).to(device)/49, padding=3)
+        self.dog_thres = 5e-4
+        self.loss = torch.nn.BCEWithLogitsLoss()
+    
+    def get_edges(self, yb):
+        with torch.no_grad():
+            # TODO: torchsript
+            dog = self.get_edge_1(yb) - self.get_edge_2(yb)
+        return dog < -self.dog_thres, dog > self.dog_thres
+    
+    def __call__(self, pb, yb, **kwargs):
+        l = 0
+        bs = yb.shape[0]
+        
+        for y, p, e1, e2 in zip(yb, pb, *self.get_edges(yb.detach())):
+            y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+            y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+            l += self.loss(y_h, y)
+        l /= bs
+        return l
 
 def dice_loss(inp, target, eps=1e-6):
     with torch.no_grad():
@@ -59,7 +84,8 @@ def lovasz_grad(gt_sorted):
     gts = gt_sorted.sum()
     intersection = gts - gt_sorted.float().cumsum(0)
     union = gts + (1 - gt_sorted).float().cumsum(0)
-    jaccard = 1. - intersection / union
+    jaccard = 1. - intersection / (union)
+    #print('jac: ', jaccard.max(), jaccard.min())
     if p > 1: # cover 1-pixel case
         jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
     return jaccard
@@ -119,10 +145,16 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None):
       ignore: void class id
     """
     if per_image:
-        loss = mean(lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore))
-                          for log, lab in zip(logits, labels))
+        losses = (lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore)) for log, lab in zip(logits, labels))
+        loss = mean(losses, ignore_nan=True)
     else:
         loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore))
+    if not isinstance(loss, torch.Tensor):
+        print('wtf')
+        print(logits.shape, logits)
+        print(loss, logits.max(), logits.min(), labels.max(), labels.min())
+    elif torch.isnan(loss):
+        print(loss, logits.max(), logits.min(), labels.max(), labels.min())
     return loss
 
 
@@ -183,7 +215,6 @@ def binary_xloss(logits, labels, ignore=None):
     return loss
 
 
-
 # --------------------------- HELPER FUNCTIONS ---------------------------
 
 def mean(l, ignore_nan=False, empty=0):
@@ -192,7 +223,7 @@ def mean(l, ignore_nan=False, empty=0):
     """
     l = iter(l)
     if ignore_nan:
-        l = ifilterfalse(np.isnan, l)
+        l = ifilterfalse(torch.isnan, l)
     try:
         n = 1
         acc = next(l)

@@ -14,15 +14,17 @@ except ImportError: # py3k
 class EdgeLoss:
     def __init__(self, gpu=True):
         device = 'cuda' if gpu else 'cpu'
-        self.get_edge_1 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,3,3).to(device)/9, padding=1)
-        self.get_edge_2 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,7,7).to(device)/49, padding=3)
-        self.dog_thres = 5e-4
+        k1, k2 = 3, 15
+        self.get_edge_1 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k1,k1).to(device)/k1**2, padding=1) # TODO padding
+        self.get_edge_2 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k2,k2).to(device)/k2**2, padding=(k2-1)//2)
+        self.dog_thres = 1e-4
         self.loss = torch.nn.BCEWithLogitsLoss()
     
     def get_edges(self, yb):
         with torch.no_grad():
             # TODO: torchsript
-            dog = self.get_edge_1(yb) - self.get_edge_2(yb)
+            #dog = self.get_edge_1(yb) - self.get_edge_2(yb)
+            dog = yb - self.get_edge_2(yb)
         return dog < -self.dog_thres, dog > self.dog_thres
     
     def __call__(self, pb, yb, **kwargs):
@@ -30,8 +32,13 @@ class EdgeLoss:
         bs = yb.shape[0]
         
         for y, p, e1, e2 in zip(yb, pb, *self.get_edges(yb.detach())):
-            y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
-            y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+            # EE
+            #y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+            #y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+
+            # Double EE
+            y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+            y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
             l += self.loss(y_h, y)
         l /= bs
         return l

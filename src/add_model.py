@@ -2,10 +2,12 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import optim
 from torch.nn import init
+import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel
+
+
 
 class FoldModel(nn.Module):
     def __init__(self, models):
@@ -223,6 +225,19 @@ class base_unet(base_enc_unet):
         d1 = self.upsample1(d2)
         d1 = self.d1(self.cat(d1,e1))
         return d1
+
+
+class Unet(base_unet):
+    def __init__(self, *args, **kwargs):
+        super(Unet, self).__init__( *args, **kwargs)
+        self.conv_1x1 = nn.Conv2d(self.init_features, self.out_channels, kernel_size=1,stride=1,padding=0)
+    
+    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
+    
+    def forward(self, x):
+        x = super(Unet, self).forward(x)
+        return self.conv_1x1(x)
+
 
 class domain_head(nn.Module):
     def __init__(self, in_channels=16*32):

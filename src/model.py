@@ -1,28 +1,17 @@
-from collections import OrderedDict
+from pathlib import Path
 from functools import partial
-
+from collections import OrderedDict
+from logger import logger
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import optim
 from torch.nn import init
+import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel
+import segmentation_models_pytorch as smp
 
 from add_model import *
-
-
-
-class Unet(base_unet):
-    def __init__(self, *args, **kwargs):
-        super(Unet, self).__init__( *args, **kwargs)
-        self.conv_1x1 = nn.Conv2d(self.init_features, self.out_channels, kernel_size=1,stride=1,padding=0)
-    
-    def _layer_init(self): nn.init.constant_(self.conv_1x1.bias, -4.59)
-    
-    def forward(self, x):
-        x = super(Unet, self).forward(x)
-        return self.conv_1x1(x)
 
 
 def to_cuda(models): return [model.cuda() for model in models]
@@ -31,7 +20,6 @@ def sync_bn(models): return [apex.parallel.convert_syncbn_model(m) for m in mode
 def get_trainable_parameters(model): return model.parameters()
 def get_lr(**kwargs): return kwargs.get('lr', 1e-4)
 def dd_parallel(models): return [DistributedDataParallel(m) for m in models]
-
 
 def init_model(model):
     for m in model.modules():
@@ -43,11 +31,7 @@ def init_model(model):
     if hasattr(model, '_layer_init'):
         model._layer_init()
 
-
 def model_select():
-    #model = Unet
-    #model = NestedUNet
-    import segmentation_models_pytorch as smp
     model = smp.manet.MAnet
     #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b3')
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
@@ -59,8 +43,14 @@ def build_model(cfg):
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
     model = model_select()()
-    #init_model(model)
-    #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
+    if cfg.TRAIN.INIT_MODEL: 
+        logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
+        model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
+    else:
+        pass
+        #init_model(model)
+        #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
+
     model = model.cuda()
     
     opt = optim.AdamW
@@ -71,11 +61,17 @@ def build_model(cfg):
     model.train()
     return model, optimizer
 
-def load_model(cfg, path):
+def load_model(cfg, model_folder_path, eval_mode=True):
     # model_select syncing build and load, probably should be in cfg, by key as in datasets
     model = model_select()()
-    
+    model = _load_model_state(model, model_folder_path)
+    if eval_mode: model.eval()
+    return model
+
+def _load_model_state(model, path):
+    path = get_last_model_name(path)
     state_dict = torch.load(path)['model_state']
+
     # Strip ddp model TODO dont save it like that
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -86,7 +82,21 @@ def load_model(cfg, path):
     
     model.load_state_dict(new_state_dict)
     del new_state_dict
-    
-    model.eval()
     return model
 
+def parse_model_path(p):
+    name = str(p.name)
+    epoch = name.split('_')[0]
+    return int(epoch[1:])
+
+def get_last_model_name(src):
+    # assumes that model name is of type e500_blabla.pth, sorted by epoch #500
+    model_names = list(Path(src).glob('*.pth'))
+    assert model_names == [], 'No valid models at init path'
+
+    res = []
+    for i, m in enumerate(model_names):
+        epoch = parse_model_path(m)
+        res.append([i,epoch])
+    idx = sorted(res, key=lambda x: -x[1])[0][0]
+    return model_names[idx]

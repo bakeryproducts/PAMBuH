@@ -29,13 +29,13 @@ def clo(logits, predicts, reduction='none'):
 
 def lovedge(logits, predicts, edgeloss, **kwargs):
     w1 = 0
-    w2 = 1 - w1 
+    w2 = (1 - w1) * 4
     #l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
     #l1 = loss.symmetric_lovasz(logits, predicts)
     l2 = edgeloss(logits, predicts)
     #print(l1,l2)
     #if reduction == 'none': l2 = l2.mean((1,2,3))
-    return l2#l1*w1 + l2*w2
+    return l2 * w2
 
 def start(cfg, output_folder):
     datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'VALID2'])
@@ -87,11 +87,11 @@ def start_fold(cfg, output_folder, datasets):
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
-    l0,l1,l2 = 5e-5, 2e-4, 3e-5
-    scale = 1/2  #cfg.PARALLEL.WORLD_SIZE
+    #l0,l1,l2 = 5e-5, 2e-4, 3e-5
+    #scale = 1/2 
+    l0,l1,l2, scale = cfg.TRAIN.LRS
+    l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
 
-    l0,l1,l2 = l0/scale, l1/scale, l2/scale
-    #l0,l1,l2 = l0, l1/scale, l2
     lr_cos_sched = sh.schedulers.combine_scheds([
         [.02, sh.schedulers.sched_cos(l0,l1)],
         [.98, sh.schedulers.sched_cos(l1,l2)]])

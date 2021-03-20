@@ -12,11 +12,12 @@ except ImportError: # py3k
     from itertools import  filterfalse as ifilterfalse
 
 class EdgeLoss:
-    def __init__(self, gpu=True):
-        device = 'cuda' if gpu else 'cpu'
+    def __init__(self, mode='single', gpu=True):
+        self.mode = mode
+        self.device = 'cuda' if gpu else 'cpu'
         k1, k2 = 3, 15
-        self.get_edge_1 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k1,k1).to(device)/k1**2, padding=1) # TODO padding
-        self.get_edge_2 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k2,k2).to(device)/k2**2, padding=(k2-1)//2)
+        #self.get_edge_1 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k1,k1).to(device)/k1**2, padding=1) # TODO padding
+        self.get_edge_2 = partial(torch.nn.functional.conv2d, weight=torch.ones(1,1,k2,k2).to(self.device)/k2**2, padding=(k2-1)//2)
         self.dog_thres = 1e-4
         self.loss = torch.nn.BCEWithLogitsLoss()
     
@@ -28,18 +29,26 @@ class EdgeLoss:
         return dog < -self.dog_thres, dog > self.dog_thres
     
     def __call__(self, pb, yb, **kwargs):
-        l = 0
+        l = torch.tensor(0.).to(self.device)
         bs = yb.shape[0]
         
         for y, p, e1, e2 in zip(yb, pb, *self.get_edges(yb.detach())):
-            # EE
-            #y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
-            #y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+            if not (e1.any() and e2.any()): continue
+            if self.mode == 'single':
+                # EE
+                g  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+                y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+            elif self.mode == 'double':
+                # Double EE
+                g  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+                y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
+            elif self.mode == 'edge':
+                # Only edge
+                g  = torch.cat((y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
+                y_h= torch.cat((p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
 
-            # Double EE
-            y  = torch.cat((y.reshape(1,-1)[0], y[e1 == 1], y[e1 == 1], y[e2 == 1]), 0).unsqueeze(0)
-            y_h= torch.cat((p.reshape(1,-1)[0], p[e1 == 1], p[e1 == 1], p[e2 == 1]), 0).unsqueeze(0)
-            l += self.loss(y_h, y)
+            l += self.loss(y_h, g)
+
         l /= bs
         return l
 

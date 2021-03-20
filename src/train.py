@@ -18,24 +18,25 @@ from model import build_model
 from callbacks import *
 
 
-def clo(logits, predicts, reduction='none'):
+def clo(logits, targets, reduction='none'):
     w1 = .9
     w2 = 1 - w1 
-    #l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
-    l1 = loss.symmetric_lovasz(logits, predicts)
-    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, predicts, reduction=reduction)
+    #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
+    l1 = loss.symmetric_lovasz(logits, targets)
+    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction=reduction)
     #if reduction == 'none': l2 = l2.mean((1,2,3))
     return l1*w1 + l2*w2
 
-def lovedge(logits, predicts, edgeloss, **kwargs):
-    w1 = 0
-    w2 = (1 - w1) * 4
-    #l1 = loss.lovasz_hinge(logits, predicts, reduction=reduction)
-    #l1 = loss.symmetric_lovasz(logits, predicts)
-    l2 = edgeloss(logits, predicts)
+def lovedge(logits, targets, edgeloss, **kwargs):
+    w1 = .7
+    w2 = (1 - w1) * 3
+    #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
+    l1 = loss.symmetric_lovasz(logits, targets)
+    l2 = edgeloss(logits, targets)
     #print(l1,l2)
     #if reduction == 'none': l2 = l2.mean((1,2,3))
-    return l2 * w2
+    #print(l1.item(), l2.item())
+    return l2 * w2 + l1 * w1
 
 def start(cfg, output_folder):
     datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'VALID2'])
@@ -60,7 +61,7 @@ def start_fold(cfg, output_folder, datasets):
     model, opt = build_model(cfg)
 
     #criterion = partial(clo, reduction=('none' if selective else 'mean'))
-    criterion = partial(lovedge, edgeloss=loss.EdgeLoss())
+    criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) if not selective else SelectiveTrainCB(logger=logger)
     val_cb = ValCB(dls['VALID2'],logger=logger)

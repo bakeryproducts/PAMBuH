@@ -62,6 +62,7 @@ def build_model(cfg):
     return model, optimizer
 
 def load_model(cfg, model_folder_path, eval_mode=True):
+    print(model_folder_path)
     # model_select syncing build and load, probably should be in cfg, by key as in datasets
     model = model_select()()
     model = _load_model_state(model, model_folder_path)
@@ -69,7 +70,7 @@ def load_model(cfg, model_folder_path, eval_mode=True):
     return model
 
 def _load_model_state(model, path):
-    path = get_last_model_name(path)
+    if path.suffix != '.pth': path = get_last_model_name(path)
     state_dict = torch.load(path)['model_state']
 
     # Strip ddp model TODO dont save it like that

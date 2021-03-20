@@ -146,14 +146,10 @@ if __name__ == '__main__':
     os.environ['CPL_LOG'] = '/dev/null'
     import infer
 
-    model_folder = 'output/924/'
+    #model_folder = 'output/924/'
     #model_folder = 'output/2021_Mar_16_23_30_30_PAMBUH/'
     #model_folder = 'output/2021_Mar_17_13_20_57_PAMBUH/'
-    #model_folder = 'output/2021_Mar_17_18_22_31_PAMBUH/'
-    #model_folder = 'output/2021_Mar_17_23_03_21_PAMBUH/'
-
-    #model_folder = 'output/2021_Mar_18_20_12_51_PAMBUH/'
-    #model_folder = 'output/2021_Mar_18_23_25_33_PAMBUH/'
+    model_folder = 'output/2021_Mar_20_00_54_34_PAMBUH/'
     
 
     block_size = 2048

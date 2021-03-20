@@ -5,7 +5,7 @@ DATA:
   TRAIN:
     DATASETS: ['train2048x25', 'backs_10_x25_2048', 'backs_10_x25_2048_cortex']
     GPU_PRELOAD: False
-    PRELOAD: True
+    PRELOAD: False
     CACHE: False
     MULTIPLY: {'rate':2}
   VALID:
@@ -38,12 +38,12 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00005, 0.0002, 0.00003, 2]
+  LRS: [0.00005, 0.0002, 0.00003, 1]
   DOWNSCALE: 4
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   DOUBLE_HARD: True
-  #INIT_MODEL: 'output/2021_Mar_19_18_58_47_PAMBUH/models/'
+  INIT_MODEL: 'output/2021_Mar_19_10_46_26_PAMBUH/models/'
   AMP: True
   GPUS: [0,1,2,3]
   NUM_WORKERS: 6
@@ -52,7 +52,7 @@ TRAIN:
   SCALAR_STEP: 1
   TB_STEP: 5
   
-  EPOCH_COUNT: 150
+  EPOCH_COUNT: 100
   BATCH_SIZE: 64
 VALID:
   STEP: 5

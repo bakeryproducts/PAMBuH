@@ -49,7 +49,7 @@ class Augmentator:
     def color_jit(self):
         return albu.OneOf([
                     albu.HueSaturationValue(10,15,10),
-                    albu.CLAHE(clip_limit=4),
+                    #albu.CLAHE(clip_limit=4),
                     albu.RandomBrightnessContrast(.3,.3),
                     #albu.ColorJitter(brightness=0.4, contrast=0.1, saturation=0.1, hue=0.1)
                 ], p=0.5)

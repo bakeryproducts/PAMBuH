@@ -32,8 +32,11 @@ def init_model(model):
         model._layer_init()
 
 def model_select():
-    model = smp.manet.MAnet
-    #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b3')
+    #model = smp.manet.MAnet
+    #model = smp.Unet
+
+    model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b4')
+    #model = smp.DeepLabV3Plus
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
     #model = partial(smp.UnetPlusPlus, encoder_name='se_resnet50')#, encoder_depth=4, decoder_channels=[256,128,32,16])
     return model
@@ -70,6 +73,7 @@ def load_model(cfg, model_folder_path, eval_mode=True):
     return model
 
 def _load_model_state(model, path):
+    path = Path(path)
     if path.suffix != '.pth': path = get_last_model_name(path)
     state_dict = torch.load(path)['model_state']
 

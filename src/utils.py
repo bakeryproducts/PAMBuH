@@ -147,15 +147,14 @@ def mp_func_gen(foo, args, n, progress=None):
 
 
 def get_cortex_polygons(anot_structs_json: Dict) -> List[geometry.Polygon]:
-    """ Gets list of cortex polygons from anot_structs_json.
-    """
+    return get_polygons_by_type(anot_structs_json, 'Cortex')
 
-    cortex_polygons = []
+def get_polygons_by_type(anot_structs_json: Dict, name: str) -> List[geometry.Polygon]:
+    polygons = []
     for record in anot_structs_json:
-        if record['properties']['classification']['name'] == 'Cortex':
-            cortex_polygons += json_record_to_poly(record)
-    return cortex_polygons
-
+        if record['properties']['classification']['name'] == name:
+            polygons += json_record_to_poly(record)
+    return polygons
 
 def flatten_2dlist(list2d: List) -> List:
     """Converts 2d list into 1d list.

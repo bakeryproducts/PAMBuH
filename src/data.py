@@ -123,19 +123,13 @@ def init_datasets(cfg):
         "full1024x25": SD(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25/masks'),
         "train1024x25": SD(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
         "val1024x25": SD(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
-        "backs_20_x25_1024": SD(DATA_DIR/'backs020_x25/imgs', DATA_DIR/'backs020_x25/masks'),
-        "backs_10_x25_2048": SD(DATA_DIR/'backs010_x25/imgs', DATA_DIR/'backs010_x25/masks'),
-        "backs_10_x25_2048_cortex": SD(DATA_DIR/'backs010_x25_cortex/imgs', DATA_DIR/'backs010_x25_cortex/masks'),
+        "backs_rand": SD(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
+        "backs_cort": SD(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
+        "backs_medu": SD(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
 
-        "full2048x25": SD(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
+
         "train2048x25": SD(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
         "val2048x25": SD(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
-        "val2048x25_hard": SD(DATA_DIR/'SPLITS/split2048x25_hard/val/imgs', DATA_DIR/'SPLITS/split2048x25_hard/val/masks'),
-
-        "train1024x5": SD(DATA_DIR/'SPLITS/split1024x5/train/imgs', DATA_DIR/'SPLITS/split1024x5/train/masks'),
-        "val1024x5": SD(DATA_DIR/'SPLITS/split1024x5/val/imgs', DATA_DIR/'SPLITS/split1024x5/val/masks'),
-        "backs_10_x5_1024": SD(DATA_DIR/'backs010_x5/imgs', DATA_DIR/'backs010_x5/masks'),
-
     }
     return  DATASETS
 
@@ -214,13 +208,10 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = True
+    drop_last = False
     sampler = None 
 
     if selective:
-        #_s = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
-        #indxs = list(_s)
-        #dataset = FoldDataset(dataset, indxs)
         weights = torch.ones(len(dataset))
         sampler = SelectiveSampler(weights) 
 

@@ -52,7 +52,7 @@ def get_last_model(src):
     return models[idx]
 
 def rescale(batch_img, scale): 
-    return torch.nn.functional.interpolate(batch_img, scale_factor=(scale, scale), mode='bilinear')
+    return torch.nn.functional.interpolate(batch_img, scale_factor=(scale, scale), mode='bilinear', align_corners=False)
 
 def preprocess_image(img, scale, transform):
     ch, H,W, dtype = *img.shape, img.dtype

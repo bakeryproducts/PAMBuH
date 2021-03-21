@@ -27,10 +27,7 @@ class GdalSampler:
         self._records_json = jread(img_polygons_path)
         self._mask = rasterio.open(mask_path)
         self._img = rasterio.open(img_path)
-        self._img_wh = img_wh
-        self._mask_wh = mask_wh
-        self._bands_img = (1, 2, 3)
-        self._bands_mask = 1
+        self._wh = img_wh
         self._count = -1
         self._rand_shift_range = rand_shift_range
         # Get 1d list of polygons
@@ -52,25 +49,15 @@ class GdalSampler:
             raise StopIteration("Failed to proceed to the next step")
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        x_rand_shift, y_rand_shift = random.randint(-self._rand_shift_range[0], self._rand_shift_range[0]), \
-                                     random.randint(-self._rand_shift_range[1], self._rand_shift_range[1])
-        x_shift, y_shift = -self._img_wh[0]//2 + x_rand_shift, -self._img_wh[1]//2 + x_rand_shift
-
-        window_img = Window(self._polygons_centroid[idx][0]+x_shift,
-                            self._polygons_centroid[idx][1]+y_shift, * self._img_wh)
-        window_mask = Window(self._polygons_centroid[idx][0]+x_shift,
-                             self._polygons_centroid[idx][1]+y_shift, * self._mask_wh)
-
-        # TODO ?
-        # if shift: x+=get_shift(), y+=get_shift()
-        #self._img.read(((x,x+w),(y,y+h)))
-        
-        img = self._img.read(window=window_img)
-        mask = self._mask.read(window=window_mask)
+        y,x = self._polygons_centroid[idx]
+        w,h = self._wh
+        y,x = y-h//2, x-w//2 # align center of crop with poly
+        window = ((x, x+w),(y, y+h))
+        img = self._img.read(window=window, boundless=True)
+        mask = self._mask.read(window=window, boundless=True)
         return img, mask
 
     def __del__(self):
-        del self._records_json
         del self._mask
         del self._img
 

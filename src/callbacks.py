@@ -61,7 +61,7 @@ class TrackResultsCB(sh.callbacks.Callback):
         batch_size = xb.shape[0]
         #print(self.preds.shape, yb.shape, xb.shape)
         p = torch.sigmoid(self.preds.cpu().float())
-        p = (p>.5).float()
+        p = (p>.4).float()
         dice = loss.dice_loss(p, yb.cpu().float())
         #print(n, dice, dice*n)
         self.accs.append(dice * batch_size)
@@ -96,7 +96,7 @@ class TBMetricCB(TrackResultsCB):
         #self.log_debug('tb metric after validation')
         self.val_loss = sum(self.losses) / sum(self.samples_count)
         self.valid_dice =  sum(self.accs) / sum(self.samples_count)
-        self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
+        #self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
     def after_epoch(self):
@@ -208,12 +208,9 @@ class TrainCB(sh.callbacks.Callback):
         sh.utils.store_attr(self, locals())
         self.scaler = torch.cuda.amp.GradScaler() 
 
-    def before_fit(self): self.reduction = 'mean'
-
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
-        self.learner.unreduced_loss = []
     
     def train_step(self):
         for i in range(len(self.opt.param_groups)):
@@ -223,24 +220,12 @@ class TrainCB(sh.callbacks.Callback):
         if self.kwargs['cfg'].TRAIN.AMP:
             with torch.cuda.amp.autocast():
                 self.learner.preds = self.model(xb)
-                if torch.isnan(self.learner.preds[0,0,0,0]):
-                    torch.save(self.learner.preds, 'wtf.npy')
-                    torch.save(self.batch, 'wtfbatch.npy')
-                    torch.save(self.model, 'wtfmodel.npy')
-                    for p in self.model.parameters():
-                        print(p.abs().max())
-
-                self.learner.loss= self.loss_func(self.preds, yb, reduction=self.reduction)
+                self.learner.loss= self.loss_func(self.preds, yb)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
                 self.scaler.scale(self.learner.loss).backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.scaler.step(self.learner.opt)
                 self.scaler.update()
-        else:
-            self.learner.preds = self.model(xb)
-            self.learner.loss= self.loss_func(self.preds, yb, reduction=self.reduction)
-            self.learner.loss.backward()
-            self.learner.opt.step()
-            
+        else: raise Exception('but why?')
         self.learner.opt.zero_grad()
 
 

@@ -38,11 +38,12 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00005, 0.00015, 0.00005, 1]
+  LRS: [0.00003, 0.0001, 0.00003, 1]
   DOWNSCALE: 4
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
-  DOUBLE_HARD: True
+  HARD_MULT: 3
+  #WEIGHTS: 'input/scores_color_train.pkl'
   #INIT_MODEL: 'output/2021_Mar_21_12_50_40_PAMBUH/models/'
   AMP: True
   GPUS: [0,1,2,3]
@@ -53,7 +54,7 @@ TRAIN:
   TB_STEP: 5
   
   EPOCH_COUNT: 100
-  BATCH_SIZE: 128
+  BATCH_SIZE: 64
 VALID:
   STEP: 5
   BATCH_SIZE: 16

@@ -156,7 +156,7 @@ def gpu_select(gpus):
         return gpus[0] # local run
 
     # MP run from run_inference
-    time.sleep(random.random())
+    time.sleep(2*random.random()) # syncing GPU dict between processes
     gpu = None
     while True:
         time.sleep(1)

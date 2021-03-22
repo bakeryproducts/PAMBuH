@@ -1,3 +1,4 @@
+import pickle
 from PIL import Image
 from pathlib import Path
 from functools import partial, reduce
@@ -20,6 +21,26 @@ from _data import *
 from sampler import GdalSampler
 from nn_sampler import SelectiveSampler, DistributedSamplerWrapper
 
+
+class WeightedDataset:
+    def __init__(self, dataset, scores, replacement=True):
+        assert len(dataset) == len(scores), (len(dataset), len(scores))
+        scores = (1 + scores) ** (2)
+        self.scores = scores / scores.sum()
+        self.dataset = dataset
+        self.replacement = replacement
+        self.idxs = list(range(len(self.dataset)))
+        #self.sampler = WeightedRandomSampler(self.scores, len(self.scores), replacement=replacement)
+    
+    def __getitem__(self, _):
+        num_samples = 1
+        idx = np.random.choice(self.idxs, num_samples, self.replacement, self.scores)
+        #idxs = list(self.sampler)
+        return self.dataset[idx[0]]
+        
+    def __len__(self): return len(self.dataset)
+
+
 class SegmentDataset:
     '''
     mode_train False  is for viewing imgs in ipunb
@@ -35,7 +56,7 @@ class SegmentDataset:
                     0.png
                     1.png
     '''
-    def __init__(self, imgs_path, masks_path, mode_train=True, double_hard=False):
+    def __init__(self, imgs_path, masks_path, mode_train=True, hard_mult=None, weights=None):
         self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
         self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
         self.mode_train = mode_train
@@ -56,6 +77,7 @@ class SegmentDataset:
                          '095bf7a1f': 1,
                          '2f6ecfcdf': 0,
                          }
+        scores = self._load_scores(weights) if weights else None
         
         dss = []
         for imgf, maskf in zip(self.img_folders, self.masks_folders):
@@ -65,11 +87,18 @@ class SegmentDataset:
                 ids.process_item = expander
                 mds.process_item = expander_float
             dataset = PairDataset(ids, mds)
-            if double_hard and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, 2)
+
+            if weights: dataset = WeightedDataset(dataset, scores[imgf.stem])
+            if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
             dss.append(dataset)
         
         self.dataset = ConcatDataset(dss)
     
+    def _load_scores(self, path):
+        with open(path, 'rb') as f:
+            scores = pickle.load(f)
+        return scores
+
     def __len__(self): return len(self.dataset)
     def __getitem__(self, idx): return self.dataset[idx]
     def _view(self, idx):
@@ -116,20 +145,17 @@ def init_datasets(cfg):
     """
     DATA_DIR = Path(cfg.INPUTS).absolute()
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
-    dd = cfg['TRAIN']['DOUBLE_HARD']
-    SD = partial(SegmentDataset, double_hard=dd)
+    mult = cfg['TRAIN']['HARD_MULT']
+    weights = cfg['TRAIN']['WEIGHTS']
+    AuxDataset = partial(SegmentDataset, hard_mult=mult, weights=weights)
     
     DATASETS = {
-        "full1024x25": SD(DATA_DIR/'CUTS/cuts1024x25/imgs', DATA_DIR/'CUTS/cuts1024x25/masks'),
-        "train1024x25": SD(DATA_DIR/'SPLITS/split1024x25/train/imgs', DATA_DIR/'SPLITS/split1024x25/train/masks'),
-        "val1024x25": SD(DATA_DIR/'SPLITS/split1024x25/val/imgs', DATA_DIR/'SPLITS/split1024x25/val/masks'),
-        "backs_rand": SD(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
-        "backs_cort": SD(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
-        "backs_medu": SD(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
+        "backs_rand": SegmentDataset(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
+        "backs_cort": SegmentDataset(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
+        "backs_medu": SegmentDataset(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
 
-
-        "train2048x25": SD(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
-        "val2048x25": SD(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
+        "train2048x25": AuxDataset(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
+        "val2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
     }
     return  DATASETS
 
@@ -208,7 +234,7 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = False
+    drop_last = True
     sampler = None 
 
     if selective:

@@ -273,6 +273,9 @@ def make_datasets_folds(cfg, datasets, n, shuffle=False):
         test_fold = folds[i]
         folded_datasets[i]['VALID'] = test_fold
         folded_datasets[i]['TRAIN'] = ConcatDataset(train_folds)
+        if 'SSL' in datasets:
+            folded_datasets[i]['SSL'] = datasets['SSL']
+
     
     return folded_datasets
 

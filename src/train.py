@@ -25,10 +25,10 @@ def clo(logits, targets, reduction='none'):
     l1 = loss.symmetric_lovasz(logits, targets)
     #l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction=reduction)
     #if reduction == 'none': l2 = l2.mean((1,2,3))
-    return l1*w1# + l2*w2
+    return l1*w1 #+ l2*w2
 
 def lovedge(logits, targets, edgeloss, **kwargs):
-    w1 = .7
+    w1 = .1
     w2 = (1 - w1) * 4
     #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
     l1 = loss.symmetric_lovasz(logits, targets)
@@ -39,7 +39,7 @@ def lovedge(logits, targets, edgeloss, **kwargs):
     return l2 * w2 + l1 * w1
 
 def start(cfg, output_folder):
-    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
+    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'SSL'])
     n = cfg.TRAIN.NUM_FOLDS
     if n <= 1: start_fold(cfg, output_folder, datasets)
     else: 
@@ -63,7 +63,8 @@ def start_fold(cfg, output_folder, datasets):
     criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
-    train_cb = TrainCB(logger=logger) if not selective else SelectiveTrainCB(logger=logger)
+    train_cb = TrainCB(logger=logger) 
+    #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 
     val_cb = ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
@@ -94,8 +95,8 @@ def start_fold(cfg, output_folder, datasets):
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.1, sh.schedulers.sched_cos(l0,l1)],
-        [.9, sh.schedulers.sched_cos(l1,l2)]])
+        [.03, sh.schedulers.sched_cos(l0,l1)],
+        [.97, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
     cbs = [CudaCB(), train_cb, val_cb, lrcb]
         

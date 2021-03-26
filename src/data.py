@@ -40,6 +40,38 @@ class WeightedDataset:
         
     def __len__(self): return len(self.dataset)
 
+class TransformSSLDataset:
+    def __init__(self, dataset, transforms):
+        self.dataset = dataset
+        self.transforms = albu.Compose([]) if transforms is None else transforms
+        self.norm = self.transforms[-1]
+    
+    def __getitem__(self, idx):
+        i = self.dataset.__getitem__(idx)
+        ai = self.transforms(image=i)['image']
+        i = self.norm(image=i)['image']
+        return ai, i
+    
+    def __len__(self): return len(self.dataset)
+    
+class SSLDataset:
+    def __init__(self, root, crop_size):
+        self.dataset = ImageDataset(root, '*/*.png')
+        self.dataset.process_item = expander
+        self.dataset = MultiplyDataset(self.dataset, 4)
+        self.d4 = albu.Compose([
+                                albu.ShiftScaleRotate(0.0625, 0.2, 45, p=.2), 
+                                albu.RandomCrop(*crop_size),
+                                albu.Flip(),
+                                albu.RandomRotate90()
+                                ])
+            
+    def __getitem__(self, idx):
+        i = self.dataset[idx]
+        i = self.d4(image=i)['image']
+        return i
+
+    def __len__(self): return len(self.dataset)
 
 class SegmentDataset:
     '''
@@ -88,7 +120,7 @@ class SegmentDataset:
                 mds.process_item = expander_float
             dataset = PairDataset(ids, mds)
 
-            if weights: dataset = WeightedDataset(dataset, scores[imgf.stem])
+            #if weights: dataset = WeightedDataset(dataset, scores[imgf.stem])
             if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
             dss.append(dataset)
         
@@ -148,14 +180,30 @@ def init_datasets(cfg):
     mult = cfg['TRAIN']['HARD_MULT']
     weights = cfg['TRAIN']['WEIGHTS']
     AuxDataset = partial(SegmentDataset, hard_mult=mult, weights=weights)
+    SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
-        "backs_rand": SegmentDataset(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
-        "backs_cort": SegmentDataset(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
-        "backs_medu": SegmentDataset(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
-
+        "train2048full": AuxDataset(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
         "train2048x25": AuxDataset(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
+        "train2i": AuxDataset(DATA_DIR/'SPLITS/split2048i2/train/imgs', DATA_DIR/'SPLITS/split2048i2/train/masks'),
+
         "val2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
+        "val2i": SegmentDataset(DATA_DIR/'SPLITS/split2048i2/val/imgs', DATA_DIR/'SPLITS/split2048i2/val/masks'),
+
+        "ssl_test": SslDS(DATA_DIR/'ssl_cortex'),
+        "ssl_val": SslDS(DATA_DIR/'SPLITS/split2048i2/val/imgs'),
+
+        "backs_cort": AuxDataset(DATA_DIR/'backs_010_x25_cortex/imgs', DATA_DIR/'backs_010_x25_cortex/masks'),
+        "backs_rand": AuxDataset(DATA_DIR/'backs_020_x25_random/imgs', DATA_DIR/'backs_020_x25_random/masks'),
+
+        #"backs_rand": SegmentDataset(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
+        #"backs_cort": AuxDataset(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
+        #"backs_medu": SegmentDataset(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
+
+        #"backs_rand2i": SegmentDataset(DATA_DIR/'backs_x25_random2i/imgs', DATA_DIR/'backs_x25_random2i/masks'),
+        #"backs_medu2i": SegmentDataset(DATA_DIR/'backs_x25_medula2i/imgs', DATA_DIR/'backs_x25_medula2i/masks'),
+
+
     }
     return  DATASETS
 
@@ -190,10 +238,12 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
 
 
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
+
     transform_factory = {
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID2':{'factory':TransformDataset, 'transform_getter':train_trans_get},
+            'SSL':{'factory':TransformSSLDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
     #tag_transform_factory = {
@@ -234,7 +284,7 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = True
+    drop_last = False
     sampler = None 
 
     if selective:

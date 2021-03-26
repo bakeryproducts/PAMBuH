@@ -56,17 +56,18 @@ class TrackResultsCB(sh.callbacks.Callback):
         print(self.n_epoch, self.model.training, sum(self.losses)/n, sum(self.accs)/n)
         
     def after_batch(self):
-        xb, yb = get_xb_yb(self.batch)
-        tag = get_tag(self.batch)
-        batch_size = xb.shape[0]
-        #print(self.preds.shape, yb.shape, xb.shape)
-        p = torch.sigmoid(self.preds.cpu().float())
-        p = (p>.4).float()
-        dice = loss.dice_loss(p, yb.cpu().float())
-        #print(n, dice, dice*n)
-        self.accs.append(dice * batch_size)
-        self.samples_count.append(batch_size)
-        self.losses.append(self.loss.detach().item()*batch_size)
+        with torch.no_grad():
+            xb, yb = get_xb_yb(self.batch)
+            tag = get_tag(self.batch)
+            batch_size = xb.shape[0]
+            #print(self.preds.shape, yb.shape, xb.shape)
+            p = torch.sigmoid(self.preds)
+            p = (p>.4)
+            dice = loss.dice_loss(p.float(), yb.float())
+            #print(n, dice, dice*n)
+            self.accs.append(dice * batch_size)
+            self.samples_count.append(batch_size)
+            self.losses.append(self.loss.detach().item()*batch_size)
 
 
 class TBMetricCB(TrackResultsCB):
@@ -121,7 +122,7 @@ class TBPredictionsCB(sh.callbacks.Callback):
         xb = upscale(xb, self.wh)
 
         yb = yb[:self.count].repeat(1,3,1,1)
-        yb = upscale(yb.detach().cpu(), self.wh)
+        yb = upscale(yb.detach().cpu().float(), self.wh)
 
         preds = torch.sigmoid(preds[:self.count, ...])
         preds = preds.max(1, keepdim=True)[0].repeat(1,3,1,1)
@@ -208,24 +209,100 @@ class TrainCB(sh.callbacks.Callback):
         sh.utils.store_attr(self, locals())
         self.scaler = torch.cuda.amp.GradScaler() 
 
+    def before_fit(self): 
+        assert self.kwargs['cfg'].TRAIN.AMP
+
+    @sh.utils.on_train
+    def before_epoch(self):
+        #print('SCALE:', self.scaler.get_scale())
+
+        if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
+        for i in range(len(self.opt.param_groups)):
+            self.learner.opt.param_groups[i]['lr'] = self.lr  
+    
+    def train_step(self):
+        xb, yb = self.batch
+        with torch.cuda.amp.autocast():
+            self.learner.preds = self.model(xb)
+            self.learner.loss = self.loss_func(self.preds, yb)
+        #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
+
+        #self.learner.loss.backward()
+        self.scaler.scale(self.learner.loss).backward()
+        self.scaler.step(self.learner.opt)
+        self.scaler.update()
+        #print('SCALE:', self.scaler.get_scale())
+        #self.learner.opt.step()
+        self.learner.opt.zero_grad()
+
+
+class TrainSSLCB(sh.callbacks.Callback):
+    def __init__(self, ssl_dl, logger=None): 
+        sh.utils.store_attr(self, locals())
+        #self.scaler = torch.cuda.amp.GradScaler() 
+        self.epoch_start_ssl = 40
+        self.ssl_criterion = torch.nn.BCEWithLogitsLoss()
+        self.ssl_loss_scale = 2
+
+    def before_fit(self): 
+        assert self.kwargs['cfg'].TRAIN.AMP
+        #import torch_ema
+        #self.ema = torch_ema.ExponentialMovingAverage(self.model.parameters(), decay=0.995)
+
+
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
-    
-    def train_step(self):
+        self.ssl_it = iter(self.ssl_dl)
+
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
-            
+
+    def train_step(self):
         xb, yb = self.batch
-        if self.kwargs['cfg'].TRAIN.AMP:
-            with torch.cuda.amp.autocast():
-                self.learner.preds = self.model(xb)
-                self.learner.loss= self.loss_func(self.preds, yb)
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
-                self.scaler.scale(self.learner.loss).backward()
-                self.scaler.step(self.learner.opt)
-                self.scaler.update()
-        else: raise Exception('but why?')
+
+        with torch.cuda.amp.autocast(enabled=False):
+            self.learner.preds = self.model(xb)
+            loss1 = self.loss_func(self.learner.preds, yb)
+
+            ssl_loss = None
+            if self.n_epoch >= self.epoch_start_ssl:
+                try:
+                    xbs, ybs = next(self.ssl_it)
+                    xbs = xbs.cuda()
+                    with torch.no_grad():
+                        #self.ema.update(self.model.parameters())
+                        ybs = self.model(ybs.cuda()).sigmoid()
+                        mask = (ybs < .1 ) +  (ybs > .8) # TODO blur? ema?
+                        ybs_m = ybs[mask]
+
+                    preds = self.model(xbs)
+                    preds_m = preds[mask]
+                    if self.np_batch > .9 and np.random.random() > .5: 
+                        #print(xbs.shape, ybs.shape, preds.shape)
+                        self.learner.batch = (xbs,ybs)
+                        self.learner.preds = preds
+
+                    ssl_loss = self.ssl_criterion(preds_m, ybs_m) * self.ssl_loss_scale
+
+                except StopIteration:
+                    print('maxit:', self.np_batch)
+                    pass
+
+            if ssl_loss is not None:
+                print(loss1.item(), ssl_loss.item())
+                loss = (loss1 + ssl_loss) / 2
+            else:
+                loss = loss1
+
+            self.learner.loss = loss
+            
+        loss.backward()
+        self.learner.opt.step()
+        #self.scaler.scale(loss).backward()
+        #self.scaler.step(self.learner.opt)
+        #self.scaler.update()
+
         self.learner.opt.zero_grad()
 
 
@@ -250,8 +327,7 @@ class ValCB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
 
             with torch.no_grad():
-                with torch.cuda.amp.autocast():
-                    preds = self.model(xb)
+                preds = self.model(xb)
 
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
@@ -265,8 +341,8 @@ class ValCB(sh.callbacks.Callback):
     def val_step(self):
         xb, yb = self.batch
         with torch.no_grad():
-            with torch.cuda.amp.autocast():
-                self.learner.preds = self.model(xb)
-                self.learner.loss = self.loss_func(self.preds, yb, reduction=self.reduction)
+            #with torch.cuda.amp.autocast():
+            self.learner.preds = self.model(xb)
+            self.learner.loss = self.loss_func(self.preds, yb, reduction=self.reduction)
                 
 

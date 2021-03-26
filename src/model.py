@@ -32,8 +32,13 @@ def init_model(model):
         model._layer_init()
 
 def model_select():
-    model = partial(smp.manet.MAnet, encoder_name='timm-skresnext50_32x4d')
+    #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
+    #model = partial(smp.manet.MAnet,  encoder_name='se_resnet50')
     #model = smp.Unet
+    model = smp.manet.MAnet 
+    
+    #model = partial(smp.Unet, encoder_name='se_resnet50')
+    #model = partial(smp.UnetPlusPlus, encoder_name='se_resnet50')
     #model = smp.PAN
 #['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
 # 'resnext50_32x4d', 'resnext101_32x4d', 'resnext101_32x8d', 'resnext101_32x16d', 'resnext101_32x32d', 'resnext101_32x48d',
@@ -51,9 +56,14 @@ def model_select():
 # 'timm-regnety_040', 'timm-regnety_064', 'timm-regnety_080', 'timm-regnety_120', 'timm-regnety_160', 'timm-regnety_320',
 # 'timm-skresnet18', 'timm-skresnet34', 'timm-skresnext50_32x4d']
 
-    #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b4')
+    #model = smp.manet.MAnet
+    #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b3')
+
+    #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_032')
+
     #model = smp.DeepLabV3Plus
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
+    #model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-efficientnet-b4')#, encoder_depth=4, decoder_channels=[256,128,32,16])
     return model
 
@@ -73,10 +83,18 @@ def build_model(cfg):
     model = model.cuda()
     
     opt = optim.AdamW
+    #opt = optim.SGD
+    #opt_kwargs = {'momentum': .9, 'weight_decay':1e-2}
     opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
     
-    if cfg.PARALLEL.DDP: model = DistributedDataParallel(model, device_ids=[cfg.PARALLEL.LOCAL_RANK], find_unused_parameters=True)
+    if cfg.PARALLEL.DDP: 
+        #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        model = DistributedDataParallel(model, 
+                                    device_ids=[cfg.PARALLEL.LOCAL_RANK],
+                                    find_unused_parameters=True,
+                                    broadcast_buffers=True)
+
     model.train()
     return model, optimizer
 

@@ -197,9 +197,9 @@ def gen_pt_in_poly(polygon: geometry.Polygon,
     min_x, min_y, max_x, max_y = polygon.bounds
 
     num_attempts = 0
-    while True:
+    while num_attempts < max_num_attempts:
         random_point = geometry.Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
         if random_point.within(polygon): return random_point
-        elif num_attempts < max_num_attempts: num_attempts += 1
-        else: return polygon.centroid
+        num_attempts += 1
+    return polygon.centroid
 

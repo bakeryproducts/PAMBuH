@@ -116,7 +116,7 @@ class BackgroundSampler:
 
         glom_presence_in_backgr, trial = 0, 0
 
-        gen = partial(gen_pt_in_poly, random.choice(self._polygons)) if self._polygons is not None else self.gen_pt_in_img
+        gen = partial(gen_pt_in_poly, polygon=random.choice(self._polygons), max_num_attempts=200) if self._polygons is not None else self.gen_pt_in_img
 
         while True:
             rand_pt = gen()
@@ -159,6 +159,60 @@ class BackgroundSampler:
     def __del__(self):
         del self._mask
         del self._img
+
+
+
+class PolySampler:
+    """Generates images from polygon
+    """
+
+    def __init__(self,
+                 img_path: str,
+                 polygons: List[geometry.Polygon],
+                 img_wh: Tuple[int, int],
+                 num_samples: int,
+                 ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Example:
+            # Get list of cortex polygons
+            polygons = utils.get_cortex_polygons(utils.jread(img_anot_struct_path))
+        """
+        buffer_dist = 0
+        self._img = rasterio.open(img_path)
+        self._polygons = [poly.buffer(buffer_dist) for poly in polygons] 
+        self._w, self._h = img_wh
+        self._num_samples = num_samples
+        self._boundless = True
+        self._count = -1
+
+    def gen_pt(self) -> Tuple[int, int]:
+        # TODO refact
+        gen = partial(gen_pt_in_poly, random.choice(self._polygons)) 
+        rand_pt = gen()
+        x_cent, y_cent = np.array(rand_pt).astype(int)
+        return x_cent, y_cent
+
+    def __next__(self):
+        self._count += 1
+        if self._count < self._num_samples:
+            return self.__getitem__(self._count)
+        else:
+            self._count = -1
+            raise StopIteration("Failed to proceed to the next step")
+
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+        x_cent, y_cent = self.gen_pt()
+        x_off= x_cent - self._w // 2
+        y_off= y_cent - self._h // 2
+
+        window= Window(x_off, y_off, self._w, self._h)
+        img = self._img.read(window=window, boundless=self._boundless)
+        return img
+
+    def __iter__(self): return self
+    def __len__(self): return self._num_samples
+    def __del__(self): del self._img
+
 
 
 def _write_block(block, name):

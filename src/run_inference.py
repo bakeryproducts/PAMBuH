@@ -28,13 +28,14 @@ if __name__ == '__main__':
 
     """
     #model_folder = 'output/925/'
-    model_folder = 'output/2021_Mar_26_13_21_59_PAMBUH/'
+    model_folder = 'output/2021_Mar_28_21_49_35_PAMBUH/'
     gpu_list = [0,1,2,3]
-    threshold = int(.4 * 255)
+    threshold = int(.35 * 255)
     num_processes = len(gpu_list)
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))
     img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
+    #img_names = img_names[:2]
     logger.log('DEBUG', '\n'.join(list([str(i) for i in img_names])))
 
     m = mp.Manager()

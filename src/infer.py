@@ -105,14 +105,14 @@ def get_infer_func(root, use_tta=False):
     transform = cfg_data.norm() 
     model = get_model(root, cfg_data)
     if use_tta: 
-        transforms = tta.Compose( [
-                tta.HorizontalFlip(),
-                #tta.VerticalFlip(),
-                tta.Rotate90(angles=[0, 90]),
-                #tta.Scale(scales=[1, .5]),
-                tta.Multiply(factors=[0.9, 1, 1.1]),
-            ])
-        #transforms = tta.aliases.d4_transform()
+        #transforms = tta.Compose( [
+        #        tta.HorizontalFlip(),
+        #        #tta.VerticalFlip(),
+        #        tta.Rotate90(angles=[0, 90]),
+        #        #tta.Scale(scales=[1, .5]),
+        #        tta.Multiply(factors=[0.9, 1, 1.1]),
+        #    ])
+        transforms = tta.aliases.d4_transform()
         model = tta.SegmentationTTAWrapper(model, transforms, merge_mode='mean')
 
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)

@@ -11,6 +11,7 @@ import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
+import ema
 import utils
 import loss
 import shallow as sh
@@ -76,6 +77,7 @@ class TBMetricCB(TrackResultsCB):
             val_metrics = {'metrics':['localization_f1']}
         '''
         sh.utils.store_attr(self, locals())
+        self.max_dice = 0
 
     def parse_metrics(self, metric_collection):
         if metric_collection is None : return
@@ -97,9 +99,15 @@ class TBMetricCB(TrackResultsCB):
         #self.log_debug('tb metric after validation')
         self.val_loss = sum(self.losses) / sum(self.samples_count)
         self.valid_dice =  sum(self.accs) / sum(self.samples_count)
-        #self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
+        self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
+        if self.valid_dice2 > self.max_dice:
+            self.max_dice = self.valid_dice2
+            if self.max_dice > .9:
+                chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
+                if chpt_cb is not None: chpt_cb.do_saving(f'cmax_{round(self.max_dice, 4)}')
+            
     def after_epoch(self):
         if self.model.training: self.after_epoch_train()
         else: self.after_epoch_valid()
@@ -215,25 +223,24 @@ class TrainCB(sh.callbacks.Callback):
     @sh.utils.on_train
     def before_epoch(self):
         #print('SCALE:', self.scaler.get_scale())
-
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
     
     def train_step(self):
         xb, yb = self.batch
-        with torch.cuda.amp.autocast():
+        with torch.cuda.amp.autocast(enabled=False):
             self.learner.preds = self.model(xb)
             self.learner.loss = self.loss_func(self.preds, yb)
-        #torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.)
 
-        #self.learner.loss.backward()
-        self.scaler.scale(self.learner.loss).backward()
-        self.scaler.step(self.learner.opt)
-        self.scaler.update()
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), .5)
+        self.learner.loss.backward()
+        self.learner.opt.step()
+        #self.scaler.scale(self.learner.loss).backward()
+        #self.scaler.step(self.learner.opt)
+        #self.scaler.update()
         #print('SCALE:', self.scaler.get_scale())
-        #self.learner.opt.step()
-        self.learner.opt.zero_grad()
+        self.learner.opt.zero_grad(set_to_none=True)
 
 
 class TrainSSLCB(sh.callbacks.Callback):
@@ -343,6 +350,91 @@ class ValCB(sh.callbacks.Callback):
         with torch.no_grad():
             #with torch.cuda.amp.autocast():
             self.learner.preds = self.model(xb)
-            self.learner.loss = self.loss_func(self.preds, yb, reduction=self.reduction)
+            self.learner.loss = self.loss_func(self.preds, yb)
                 
 
+class ValEMACB(sh.callbacks.Callback):
+    def __init__(self, decay=.9, logger=None):
+        sh.utils.store_attr(self, locals())
+        self.evals = []
+        self.decay = decay
+        self.dice = 0
+        self.max_dice = .1
+
+    def before_fit(self): self.learner.model_ema = ema.ModelEmaV2(self.model, decay=self.decay)
+
+    @sh.utils.on_train
+    def after_epoch(self): 
+        decay=self.decay
+        if self.dice > self.max_dice:
+            self.max_dice = self.dice
+            self.dice = 0
+            decay = .7
+        self.log_debug(f'EMA update: decay {decay}')
+        self.learner.model_ema.update(self.model, decay)
+ 
+    @sh.utils.on_validation
+    def before_epoch(self):
+        self.run_ema_valid()
+        self.learner.metrics = []
+
+    def run_ema_valid(self):
+        self.learner.extra_accs, self.learner.extra_samples_count = [], []
+        for batch in self.dls['VALID']:
+            xb, yb = get_xb_yb(batch)
+            tag = get_tag(batch)
+            batch_size = xb.shape[0]
+
+            with torch.no_grad():
+                preds = self.learner.model_ema.module(xb)
+
+            p = torch.sigmoid(preds.cpu().float())
+            p = (p>.5).float()
+            dice = loss.dice_loss(p, yb.cpu().float())
+            self.learner.extra_accs.append(dice * batch_size)
+            self.learner.extra_samples_count.append(batch_size)
+
+        self.dice = (np.array(self.learner.extra_accs) / np.array(self.learner.extra_samples_count)).mean()
+
+    def val_step(self):
+        xb, yb = self.batch
+        with torch.no_grad():
+            self.learner.preds = self.model(xb)
+            self.learner.loss = self.loss_func(self.preds, yb)
+                
+def get_cb_by_instance(cbs, cls):
+    for cb in cbs:
+        if isinstance(cb, cls): return cb
+    return None
+
+def unwrap_model(model):
+    return model.module if hasattr(model, 'module') else model
+
+def get_state_dict(model, unwrap_fn=unwrap_model):
+    return unwrap_fn(model).state_dict()
+
+class CheckpointCB(sh.callbacks.Callback):
+    def __init__(self, save_path, ema=False, save_step=None):
+        sh.utils.store_attr(self, locals())
+        self.pct_counter = None if isinstance(self.save_step, int) else self.save_step
+        
+    def do_saving(self, val=''):
+        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema.module)
+        postfix = 'ema_' if self.ema else ''
+        torch.save({
+                'epoch': self.n_epoch,
+                'loss': self.loss,
+                'model_state': state_dict,
+                'opt_state':self.opt.state_dict(),                    
+            }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{postfix}{val}.pth'))
+
+    def after_epoch(self):
+        save = False
+        if self.n_epoch == self.total_epochs - 1: save=True
+        elif isinstance(self.save_step, int): save = self.save_step % self.n_epoch == 0 
+        else:
+            if self.np_epoch > self.pct_counter:
+                save = True
+                self.pct_counter += self.save_step
+        
+        if save: self.do_saving()

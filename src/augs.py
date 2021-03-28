@@ -37,34 +37,35 @@ class Augmentator:
     def crop_scale(self): return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.3,.7))
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
     def blur(self): return albu.OneOf([
-                        albu.GaussianBlur(),
-                        albu.MotionBlur(),
-                        albu.MedianBlur()
-                    ], p=.1)
+                        albu.GaussianBlur((3,11)),
+                        #albu.MotionBlur(),
+                        #albu.MedianBlur()
+                    ], p=.2)
     def scale(self): return albu.ShiftScaleRotate(0.0625, 0.1, 15, p=.2)
     def rotate(self): return albu.Rotate(45)
     def cutout(self): return albu.OneOf([
             albu.Cutout(8, 32, 32, 230,p=.2),
             albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.2),
             albu.CoarseDropout(16, 32, 32, 8, 8, 8, 220, p=.6)
-        ],p=.5)
+        ],p=.2)
     
     
     def d4(self): return self.compose([
                     albu.Flip(),
-                    albu.RandomRotate90()]) 
+                    albu.RandomRotate90()
+                    ]) 
 
     def multi_crop(self): return albu.OneOf([
-                    albu.RandomCrop(self.crop_h,self.crop_w, p=1),
-                    #albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.35, .5), p=1), 
+                    albu.RandomCrop(self.crop_h,self.crop_w),
+                    #albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.8, 1)), 
                     #albu.CenterCrop(self.crop_h,self.crop_w, p=.2)
                     ], p=1)    
     def color_jit(self): return albu.OneOf([
-                    albu.HueSaturationValue(10,15,10),
+                    #albu.HueSaturationValue(10,15,10),
                     #albu.CLAHE(clip_limit=4),
-                    albu.RandomBrightnessContrast(.3, .3),
-                    #albu.ColorJitter(brightness=(-.4, .1), contrast=0.1, saturation=0.1, hue=0.1)
-                    ], p=0.5)
+                    #albu.RandomBrightnessContrast(.3, .3),
+                    albu.ColorJitter(brightness=.2, contrast=0.1, saturation=0.1, hue=0.1)
+                    ], p=0.2)
 
     def aug_ssl(self): return self.compose([
                     albu.OneOf([
@@ -80,11 +81,11 @@ class Augmentator:
 
 
     def aug_light_scale(self): return self.compose([
-                                                    #self.scale(),
+                                                    self.scale(),
                                                     self.multi_crop(), 
                                                     self.d4(),
                                                     self.color_jit(),
-                                                    #self.cutout(),
+                                                    self.cutout(),
                                                     self.blur(),
                                                     self.norm()])
 

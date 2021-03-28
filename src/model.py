@@ -32,11 +32,6 @@ def init_model(model):
         model._layer_init()
 
 def model_select():
-    #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
-    #model = partial(smp.manet.MAnet,  encoder_name='se_resnet50')
-    #model = smp.Unet
-    model = smp.manet.MAnet 
-    
     #model = partial(smp.Unet, encoder_name='se_resnet50')
     #model = partial(smp.UnetPlusPlus, encoder_name='se_resnet50')
     #model = smp.PAN
@@ -57,13 +52,15 @@ def model_select():
 # 'timm-skresnet18', 'timm-skresnet34', 'timm-skresnext50_32x4d']
 
     #model = smp.manet.MAnet
-    #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b3')
-
+    #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b4')
+    model = partial(smp.manet.MAnet, encoder_name='resnext50_32x4d')
     #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_032')
-
-    #model = smp.DeepLabV3Plus
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
     #model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
+    #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
+    #model = partial(smp.manet.MAnet,  encoder_weights=None)
+
+    #model = smp.DeepLabV3Plus
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-efficientnet-b4')#, encoder_depth=4, decoder_channels=[256,128,32,16])
     return model
 
@@ -81,19 +78,18 @@ def build_model(cfg):
         #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
 
     model = model.cuda()
-    
+    if cfg.PARALLEL.DDP: 
+        #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        model = DistributedDataParallel(model, 
+                                    device_ids=[cfg.PARALLEL.LOCAL_RANK],
+                                    find_unused_parameters=False,
+                                    broadcast_buffers=True)
+
     opt = optim.AdamW
     #opt = optim.SGD
     #opt_kwargs = {'momentum': .9, 'weight_decay':1e-2}
     opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
-    
-    if cfg.PARALLEL.DDP: 
-        #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DistributedDataParallel(model, 
-                                    device_ids=[cfg.PARALLEL.LOCAL_RANK],
-                                    find_unused_parameters=True,
-                                    broadcast_buffers=True)
 
     model.train()
     return model, optimizer

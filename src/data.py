@@ -193,15 +193,16 @@ def init_datasets(cfg):
         "ssl_test": SslDS(DATA_DIR/'ssl_cortex'),
         "ssl_val": SslDS(DATA_DIR/'SPLITS/split2048i2/val/imgs'),
 
-        "backs_cort": AuxDataset(DATA_DIR/'backs_010_x25_cortex/imgs', DATA_DIR/'backs_010_x25_cortex/masks'),
-        "backs_rand": AuxDataset(DATA_DIR/'backs_020_x25_random/imgs', DATA_DIR/'backs_020_x25_random/masks'),
+        #"backs_cort": AuxDataset(DATA_DIR/'backs_010_x25_cortex/imgs', DATA_DIR/'backs_010_x25_cortex/masks'),
+        #"backs_rand": AuxDataset(DATA_DIR/'backs_020_x25_random/imgs', DATA_DIR/'backs_020_x25_random/masks'),
 
         #"backs_rand": SegmentDataset(DATA_DIR/'backs_x25_random/imgs', DATA_DIR/'backs_x25_random/masks'),
         #"backs_cort": AuxDataset(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
         #"backs_medu": SegmentDataset(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
 
-        #"backs_rand2i": SegmentDataset(DATA_DIR/'backs_x25_random2i/imgs', DATA_DIR/'backs_x25_random2i/masks'),
-        #"backs_medu2i": SegmentDataset(DATA_DIR/'backs_x25_medula2i/imgs', DATA_DIR/'backs_x25_medula2i/masks'),
+        "backs_cort2i": SegmentDataset(DATA_DIR/'backs_x25_cortex_2i/imgs', DATA_DIR/'backs_x25_cortex_2i/masks'),
+        "backs_rand2i": SegmentDataset(DATA_DIR/'backs_x25_random_2i/imgs', DATA_DIR/'backs_x25_random_2i/masks'),
+        "backs_medu2i": SegmentDataset(DATA_DIR/'backs_x25_medula_2i/imgs', DATA_DIR/'backs_x25_medula_2i/masks'),
 
 
     }
@@ -284,7 +285,7 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = False
+    drop_last = True
     sampler = None 
 
     if selective:

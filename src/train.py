@@ -23,9 +23,10 @@ def clo(logits, targets, reduction='none'):
     w2 = 1 - w1 
     #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
     l1 = loss.symmetric_lovasz(logits, targets)
-    #l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction=reduction)
+    #l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets)
     #if reduction == 'none': l2 = l2.mean((1,2,3))
     return l1*w1 #+ l2*w2
+    #return  l2*w2
 
 def lovedge(logits, targets, edgeloss, **kwargs):
     w1 = .1
@@ -61,11 +62,13 @@ def start_fold(cfg, output_folder, datasets):
     model, opt = build_model(cfg)
 
     criterion = partial(clo, reduction=('none' if selective else 'mean'))
+    #criterion = loss.focal_loss
+    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) 
     #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 
-    val_cb = ValCB(logger=logger)
+    val_cb = ValEMACB(logger=logger) if cfg.TRAIN.EMA else ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
         utils.dump_params(cfg, output_folder)
@@ -85,7 +88,8 @@ def start_fold(cfg, output_folder, datasets):
         tb_predict_cb = partial(TBPredictionsCB, writer=writer, logger=logger, step=step)
 
         tb_cbs = [tb_metric_cb(), tb_predict_cb()]
-        checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=cfg.TRAIN.SAVE_STEP)
+        #checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=cfg.TRAIN.SAVE_STEP)
+        checkpoint_cb = CheckpointCB(models_dir, ema=cfg.TRAIN.EMA, save_step=cfg.TRAIN.SAVE_STEP)
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
@@ -95,8 +99,8 @@ def start_fold(cfg, output_folder, datasets):
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.03, sh.schedulers.sched_cos(l0,l1)],
-        [.97, sh.schedulers.sched_cos(l1,l2)]])
+        [.1, sh.schedulers.sched_cos(l0,l1)],
+        [.9, sh.schedulers.sched_cos(l1,l2)]])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
     cbs = [CudaCB(), train_cb, val_cb, lrcb]
         

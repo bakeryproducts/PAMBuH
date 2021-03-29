@@ -3,7 +3,7 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['train2i', 'backs_cort2i', 'backs_medu2i', 'backs_rand2i']
+    DATASETS: ['train2i', 'backs_medu2i']
     #DATASETS: ['train2048full', 'backs_cort2i', 'backs_medu2i', 'backs_rand2i']
     #DATASETS: ['train2048x25', 'backs_cort', 'backs_rand']
     GPU_PRELOAD: False
@@ -47,7 +47,7 @@ TRAIN:
   DOWNSCALE: 4
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
-  HARD_MULT: 2
+  HARD_MULT: 1
   EMA: True
   #WEIGHTS: 'input/scores_color_train.pkl'
   #INIT_MODEL: 'output/2021_Mar_28_21_49_35_PAMBUH/models/'

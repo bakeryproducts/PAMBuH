@@ -134,8 +134,9 @@ class SegmentDataset:
     def __len__(self): return len(self.dataset)
     def __getitem__(self, idx): return self.dataset[idx]
     def _view(self, idx):
-        pair = self.__getitem__(idx)
-        return Image.blend(*pair,.5)
+        a,b = self.__getitem__(idx)
+        if b.mode == 'L': b = b.convert('RGB')
+        return Image.blend(a,b,.5)
 
 class TagSegmentDataset:
     def __init__(self, imgs_path, masks_path, mode_train=True):
@@ -180,18 +181,31 @@ def init_datasets(cfg):
     mult = cfg['TRAIN']['HARD_MULT']
     weights = cfg['TRAIN']['WEIGHTS']
     AuxDataset = partial(SegmentDataset, hard_mult=mult, weights=weights)
+
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
-        "train2048full": AuxDataset(DATA_DIR/'CUTS/cuts2048x25/imgs', DATA_DIR/'CUTS/cuts2048x25/masks'),
-        "train2048x25": AuxDataset(DATA_DIR/'SPLITS/split2048x25/train/imgs', DATA_DIR/'SPLITS/split2048x25/train/masks'),
-        "train2i": AuxDataset(DATA_DIR/'SPLITS/split2048i2/train/imgs', DATA_DIR/'SPLITS/split2048i2/train/masks'),
+        "train1536full": AuxDataset(DATA_DIR/'CUTS/cuts1536x25/imgs', DATA_DIR/'CUTS/cuts1536x25/masks'),
 
-        "val2048x25": SegmentDataset(DATA_DIR/'SPLITS/split2048x25/val/imgs', DATA_DIR/'SPLITS/split2048x25/val/masks'),
-        "val2i": SegmentDataset(DATA_DIR/'SPLITS/split2048i2/val/imgs', DATA_DIR/'SPLITS/split2048i2/val/masks'),
+        "train_0e": AuxDataset(DATA_DIR/'SPLITS/f_split/0e/train/imgs', DATA_DIR/'SPLITS/f_split/0e/train/masks'),
+        "val_0e": SegmentDataset(DATA_DIR/'SPLITS/f_split/0e/val/imgs', DATA_DIR/'SPLITS/f_split/0e/val/masks'),
 
+        "train_2a": AuxDataset(DATA_DIR/'SPLITS/f_split/2a/train/imgs', DATA_DIR/'SPLITS/f_split/2a/train/masks'),
+        "val_2a": SegmentDataset(DATA_DIR/'SPLITS/f_split/2a/val/imgs', DATA_DIR/'SPLITS/f_split/2a/val/masks'),
+
+        "train_18": AuxDataset(DATA_DIR/'SPLITS/f_split/18/train/imgs', DATA_DIR/'SPLITS/f_split/18/train/masks'),
+        "val_18": SegmentDataset(DATA_DIR/'SPLITS/f_split/18/val/imgs', DATA_DIR/'SPLITS/f_split/18/val/masks'),
+
+        "train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/imgs', DATA_DIR/'SPLITS/f_split/cc/train/masks'),
+        "val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/imgs', DATA_DIR/'SPLITS/f_split/cc/val/masks'),
+
+        "random_0e": SegmentDataset(DATA_DIR/'backs/random_020_splits/0e/train/imgs', DATA_DIR/'backs/random_020_splits/0e/train/masks'),
+        "random_2a": SegmentDataset(DATA_DIR/'backs/random_020_splits/2a/train/imgs', DATA_DIR/'backs/random_020_splits/2a/train/masks'),
+        "random_18": SegmentDataset(DATA_DIR/'backs/random_020_splits/18/train/imgs', DATA_DIR/'backs/random_020_splits/18/train/masks'),
+        "random_cc": SegmentDataset(DATA_DIR/'backs/random_020_splits/cc/train/imgs', DATA_DIR/'backs/random_020_splits/cc/train/masks'),
+
+        "sclero": SegmentDataset(DATA_DIR/'scleros_glomi/scle_cuts_1024/imgs', DATA_DIR/'scleros_glomi/scle_cuts_1024/masks'), 
         "ssl_test": SslDS(DATA_DIR/'ssl_cortex'),
-        "ssl_val": SslDS(DATA_DIR/'SPLITS/split2048i2/val/imgs'),
 
         #"backs_cort": AuxDataset(DATA_DIR/'backs_010_x25_cortex/imgs', DATA_DIR/'backs_010_x25_cortex/masks'),
         #"backs_rand": AuxDataset(DATA_DIR/'backs_020_x25_random/imgs', DATA_DIR/'backs_020_x25_random/masks'),
@@ -200,9 +214,11 @@ def init_datasets(cfg):
         #"backs_cort": AuxDataset(DATA_DIR/'backs_x25_cortex/imgs', DATA_DIR/'backs_x25_cortex/masks'),
         #"backs_medu": SegmentDataset(DATA_DIR/'backs_x25_medula/imgs', DATA_DIR/'backs_x25_medula/masks'),
 
-        "backs_cort2i": SegmentDataset(DATA_DIR/'backs_x25_cortex_2i/imgs', DATA_DIR/'backs_x25_cortex_2i/masks'),
-        "backs_rand2i": SegmentDataset(DATA_DIR/'backs_x25_random_2i/imgs', DATA_DIR/'backs_x25_random_2i/masks'),
-        "backs_medu2i": SegmentDataset(DATA_DIR/'backs_x25_medula_2i/imgs', DATA_DIR/'backs_x25_medula_2i/masks'),
+        "backs_cort": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex/imgs', DATA_DIR/'backs/backs_x25_cortex/masks'),
+        "backs_cort_0e": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/imgs', DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/masks'),
+        "backs_cort_2a": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/imgs', DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/masks'),
+        "backs_cort_18": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/imgs', DATA_DIR/'backs/backs_x25_cortex_splits/18/train/masks'),
+        "backs_cort_cc": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/imgs', DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/masks'),
 
 
     }
@@ -212,11 +228,19 @@ def create_datasets(cfg, all_datasets, dataset_types):
     converted_datasets = {}
     for dataset_type in dataset_types:
         data_field = cfg.DATA[dataset_type]
-        datasets_strings = data_field.DATASETS
-        if datasets_strings:
-            datasets = [all_datasets[ds] for ds in datasets_strings]
+        if data_field.DATASETS != (0,):
+            datasets = [all_datasets[ds] for ds in data_field.DATASETS]
             ds = TorchConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
             converted_datasets[dataset_type] = ds
+        elif data_field.FOLDS != (0,):
+            __datasets = []
+            for dss in data_field.FOLDS:
+                datasets = [all_datasets[ds] for ds in dss]
+                ds = TorchConcatDataset(datasets) if len(datasets)>1 else datasets[0] 
+                __datasets.append(ds)
+
+            converted_datasets[dataset_type] = __datasets
+
     return converted_datasets
 
 def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VALID', 'TEST']):
@@ -247,11 +271,6 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
             'SSL':{'factory':TransformSSLDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
-    #tag_transform_factory = {
-    #        'TRAIN':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
-    #        'VALID':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
-    #        'TEST':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
-    #    }
 
     extend_factories = {
              'PRELOAD':partial(PreloadingDataset, num_proc=num_proc, progress=tqdm),
@@ -260,14 +279,32 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
     }
  
     datasets = create_datasets(cfg, init_datasets(cfg), dataset_types)
-    mean, std = mean_std_dataset(datasets['TRAIN'])
-    if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
-        update_mean_std(cfg, mean, std)
+    #TODO refact
+    if isinstance(datasets['TRAIN'], list):
+        # fold mode
+        mean, std = mean_std_dataset(datasets['TRAIN'][0])
+        if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
+            update_mean_std(cfg, mean, std)
 
-    datasets = create_extensions(cfg, datasets, extend_factories)
-    transforms = create_transforms(cfg, transform_factory, dataset_types)
-    datasets = apply_transforms_datasets(datasets, transforms)
-    return datasets
+        res_datasets = {'TRAIN':[], 'VALID':[]}
+        for tds, vds in zip(datasets['TRAIN'], datasets['VALID']):
+            datasets_fold = {'TRAIN': tds, 'VALID':vds}
+            datasets = create_extensions(cfg, datasets_fold, extend_factories)
+            transforms = create_transforms(cfg, transform_factory, dataset_types)
+            datasets_fold = apply_transforms_datasets(datasets_fold, transforms)
+            res_datasets['TRAIN'].append(datasets_fold['TRAIN'])
+            res_datasets['VALID'].append(datasets_fold['VALID'])
+        return res_datasets
+
+    else:
+        mean, std = mean_std_dataset(datasets['TRAIN'])
+        if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
+            update_mean_std(cfg, mean, std)
+
+        datasets = create_extensions(cfg, datasets, extend_factories)
+        transforms = create_transforms(cfg, transform_factory, dataset_types)
+        datasets = apply_transforms_datasets(datasets, transforms)
+        return datasets
 
 def build_dataloaders(cfg, datasets, selective=True):
     '''

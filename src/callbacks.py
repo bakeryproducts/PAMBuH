@@ -370,7 +370,7 @@ class ValEMACB(sh.callbacks.Callback):
             self.max_dice = self.dice
             self.dice = 0
             decay = .7
-        self.log_debug(f'EMA update: decay {decay}')
+        #self.log_debug(f'EMA update: decay {decay}')
         self.learner.model_ema.update(self.model, decay)
  
     @sh.utils.on_validation

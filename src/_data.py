@@ -257,7 +257,19 @@ def mean_std_dataset(dataset, parts=200):
     return np.array(mm).mean(0), np.array(ss).mean(0)
 
 
-def make_datasets_folds(cfg, datasets, n, shuffle=False):
+
+def make_datasets_folds(cfg, datasets, n):
+    # datasets: {'TRAIN':[t1,t2,t3,t4], 'VALID':[v1,v2,v3,v4]}
+    folded_datasets = [{} for _ in range(n)]
+    for i, (tds, vds ) in enumerate(zip(datasets['TRAIN'], datasets['VALID'])):
+        folded_datasets[i]['VALID'] = vds
+        folded_datasets[i]['TRAIN'] = tds
+        if 'SSL' in datasets:
+            folded_datasets[i]['SSL'] = datasets['SSL']
+
+    return folded_datasets
+
+def make_datasets_folds_by_idx(cfg, datasets, n, shuffle=False):
     '''
         Returns [{'TRAIN':ds1, 'VALID':ds2}, {}, ...]
     '''

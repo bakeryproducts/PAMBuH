@@ -40,11 +40,11 @@ def lovedge(logits, targets, edgeloss, **kwargs):
     return l2 * w2 + l1 * w1
 
 def start(cfg, output_folder):
-    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'SSL'])
+    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
     n = cfg.TRAIN.NUM_FOLDS
     if n <= 1: start_fold(cfg, output_folder, datasets)
     else: 
-        datasets_folds = data.make_datasets_folds(cfg, datasets, n, shuffle=True)
+        datasets_folds = data.make_datasets_folds(cfg, datasets, n)
         for i, i_datasets in enumerate(datasets_folds):
             if cfg.PARALLEL.IS_MASTER: print(f'\n\nFOLD # {i}\n\n')
             fold_output = None

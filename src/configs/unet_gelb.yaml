@@ -3,20 +3,18 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    #DATASETS: ['train_0e', 'random_0e', 'sclero', 'backs_cort_0e']
-    #DATASETS: ['train1536full', 'random', 'sclero', 'backs_cort2i']
-    #DATASETS: ['train1536x25', 'random', 'sclero', 'backs_cort']
-    FOLDS: [['train_0e', 'random_0e', 'sclero', 'backs_cort_0e'],
-            ['train_2a', 'random_2a', 'sclero', 'backs_cort_2a'],
-            ['train_18', 'random_18', 'sclero', 'backs_cort_18'],
-            ['train_cc', 'random_cc', 'sclero', 'backs_cort_cc']]
+    DATASETS: ['train_18', 'random_18', 'sclero', 'backs_cort_18']
+    # FOLDS: [['train_0e', 'random_0e', 'sclero', 'backs_cort_0e'],
+    #         ['train_2a', 'random_2a', 'sclero', 'backs_cort_2a'],
+    #         ['train_18', 'random_18', 'sclero', 'backs_cort_18'],
+    #         ['train_cc', 'random_cc', 'sclero', 'backs_cort_cc']]
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
-    MULTIPLY: {'rate':1}
+    MULTIPLY: {'rate':2}
   VALID:
-    #DATASETS: ['val_0e']
-    FOLDS: [['val_0e'],['val_2a'],['val_18'],['val_cc']]
+    DATASETS: ['val_18']
+    #FOLDS: [['val_0e'],['val_2a'],['val_18'],['val_cc']]
     PRELOAD: False
   SSL:
     #DATASETS: ['ssl_test']
@@ -46,24 +44,23 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  #LRS: [0.00003, 0.0001, 0.00003, 45]
   LRS: [0.00002, 0.0001, 0.00002, 2]
   DOWNSCALE: 4
-  NUM_FOLDS: 4
+  NUM_FOLDS: 1
   SELECTIVE_BP: 1.
-  HARD_MULT: 1
+  HARD_MULT: 2
   EMA: True
   #WEIGHTS: 'input/scores_color_train.pkl'
   #INIT_MODEL: 'output/2021_Mar_28_21_49_35_PAMBUH/models/'
   AMP: True
-  GPUS: [3,1]
+  GPUS: [1,3]
   NUM_WORKERS: 8
   
   SAVE_STEP: 1.
   SCALAR_STEP: 1
   TB_STEP: 4
   
-  EPOCH_COUNT: 5
+  EPOCH_COUNT: 100
   BATCH_SIZE: 64
 VALID:
   STEP: 4

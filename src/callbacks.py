@@ -63,7 +63,7 @@ class TrackResultsCB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
             #print(self.preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(self.preds)
-            p = (p>.4)
+            p = (p>.35)
             dice = loss.dice_loss(p.float(), yb.float())
             #print(n, dice, dice*n)
             self.accs.append(dice * batch_size)
@@ -233,7 +233,7 @@ class TrainCB(sh.callbacks.Callback):
             self.learner.preds = self.model(xb)
             self.learner.loss = self.loss_func(self.preds, yb)
 
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), .5)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
         self.learner.loss.backward()
         self.learner.opt.step()
         #self.scaler.scale(self.learner.loss).backward()
@@ -338,7 +338,7 @@ class ValCB(sh.callbacks.Callback):
 
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.4).float()
+            p = (p>.35).float()
             dice = loss.dice_loss(p, yb.cpu().float())
             #dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
@@ -389,7 +389,7 @@ class ValEMACB(sh.callbacks.Callback):
                 preds = self.learner.model_ema.module(xb)
 
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.5).float()
+            p = (p>.35).float()
             dice = loss.dice_loss(p, yb.cpu().float())
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
@@ -437,4 +437,3 @@ class CheckpointCB(sh.callbacks.Callback):
                 save = True
                 self.pct_counter += self.save_step
         
-        if save: self.do_saving()

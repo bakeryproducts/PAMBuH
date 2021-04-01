@@ -98,17 +98,15 @@ class BackgroundSampler:
         self._step = step
         self._max_trials = max_trials
 
-        # Read rasterio mask
-        mask_arr = self._mask.read()
         # Get list of centroids
-        self._centroids = [self.gen_backgr_pt(mask_arr) for _ in range(num_samples)]
+        self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
 
     def gen_pt_in_img(self):
-        W,H = self._img.shape
-        pt  = np.random.random() * W + self._w, np.random.random() * H + self._h # lazy
+        W, H = self._img.shape
+        pt = np.random.random() * W + self._w, np.random.random() * H + self._h # lazy
         return pt
 
-    def gen_backgr_pt(self, mask_arr: np.ndarray) -> Tuple[int, int]:
+    def gen_backgr_pt(self) -> Tuple[int, int]:
         """Generates background point.
         Idea is to take only <self._max_trials> trials, if point has not been found, then increment permissible
         num of glomeruli inside background by <self._step>.
@@ -116,7 +114,8 @@ class BackgroundSampler:
 
         glom_presence_in_backgr, trial = 0, 0
 
-        gen = partial(gen_pt_in_poly, polygon=random.choice(self._polygons), max_num_attempts=200) if self._polygons is not None else self.gen_pt_in_img
+        gen = partial(gen_pt_in_poly, polygon=random.choice(self._polygons), max_num_attempts=200) \
+            if self._polygons is not None else self.gen_pt_in_img
 
         while True:
             rand_pt = gen()
@@ -124,7 +123,7 @@ class BackgroundSampler:
             x_off, y_off = x_cent - self._w // 2, y_cent - self._h // 2
             # Reverse x and y, because gdal return C H W
 
-            window= Window(x_off, y_off, self._w, self._h)
+            window = Window(x_off, y_off, self._w, self._h)
             sample_mask = self._mask.read(window=window, boundless=self._boundless)
             trial += 1 
 
@@ -148,10 +147,10 @@ class BackgroundSampler:
             raise StopIteration("Failed to proceed to the next step")
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        x_off= self._centroids[idx][0] - self._w // 2
-        y_off= self._centroids[idx][1] - self._h // 2
+        x_off = self._centroids[idx][0] - self._w // 2
+        y_off = self._centroids[idx][1] - self._h // 2
 
-        window= Window(x_off, y_off, self._w, self._h)
+        window = Window(x_off, y_off, self._w, self._h)
         img = self._img.read(window=window, boundless=self._boundless)
         mask = self._mask.read(window=window, boundless=self._boundless)
         return img, mask
@@ -202,8 +201,8 @@ class PolySampler:
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         x_cent, y_cent = self.gen_pt()
-        x_off= x_cent - self._w // 2
-        y_off= y_cent - self._h // 2
+        x_off = x_cent - self._w // 2
+        y_off = y_cent - self._h // 2
 
         window= Window(x_off, y_off, self._w, self._h)
         img = self._img.read(window=window, boundless=self._boundless)

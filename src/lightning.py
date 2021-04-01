@@ -1,13 +1,13 @@
 import numpy as np
 import cv2
 from typing import Tuple
-import PIL
 
 import utils
 
 
 def cut_off_light_from_img(img: np.ndarray,
                            threshold: int = 210,
+                           kernel_size: int = 5,
                            min_light_ratio: float = 0.005,
                            max_light_ratio: float = 0.5) -> Tuple[None, np.ndarray]:
     """Cuts off lightning from img.
@@ -18,6 +18,7 @@ def cut_off_light_from_img(img: np.ndarray,
     max_light_ratio: Min possible ratio (total number of white cells / total number of cells)
 
     Attention: Img may contain either 1 or 3 channel(s)
+
     """
 
     max_gray_val = 255
@@ -27,6 +28,9 @@ def cut_off_light_from_img(img: np.ndarray,
     if num_channels == 3:
         img = np.swapaxes(np.swapaxes(img, 0, 2), 0, 1)  # shift axis by one left
         img = utils.rgb2gray(img)
+
+    kernel = cv2.getStructuringElement(1, (kernel_size, kernel_size))
+    img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
 
     _, thresh = cv2.threshold(img, threshold, max_gray_val, cv2.THRESH_BINARY)
 

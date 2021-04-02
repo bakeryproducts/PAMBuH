@@ -14,6 +14,7 @@ def save_mask(path):
         h = img_array.shape[1]
         w = img_array.shape[2]
         print(w, h)
+        svs_file = os.path.splitext(svs_file)[0]
         img_tiff = rasterio.open(f"{svs_file}.tiff", 'w', driver='GTiff', height=h, width=w, count=3, nbits=8, dtype=np.uint8)
         img_tiff.write(img_array)
         img_tiff.close()

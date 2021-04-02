@@ -27,21 +27,23 @@ def denorm(images, mean=(0.46454108, 0.43718538, 0.39618185), std=(0.23577851, 0
     return images
 
 def get_xb_yb(b):
-    if isinstance(b[1], tuple): return b[0], b[1][0]
-    else: return b
+    #if isinstance(b[1], tuple): return b[0], b[1][0]
+    #else: return b
+    return b[0], b[1]
 
 def get_tag(b):
-    if isinstance(b[1], tuple): return b[1][1]
+    #if isinstance(b[1], tuple): return b[1][1]
+    if len(b) == 3: return b[2]
     else: return None
 
 class CudaCB(sh.callbacks.Callback):
     def before_batch(self):
         xb, yb = get_xb_yb(self.batch)
-        tag = get_tag(self.batch)
+        bb = get_tag(self.batch)
 
         yb = yb.cuda()
-        labels = yb if not tag else (yb, tag)
-        self.learner.batch = xb.cuda(), labels
+        if bb is None: self.learner.batch = xb.cuda(), yb
+        else: self.learner.batch = xb.cuda(), yb, bb.cuda()
 
     def before_fit(self): self.model.cuda()
 
@@ -63,7 +65,7 @@ class TrackResultsCB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
             #print(self.preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(self.preds)
-            p = (p>.35)
+            p = (p>.5)
             dice = loss.dice_loss(p.float(), yb.float())
             #print(n, dice, dice*n)
             self.accs.append(dice * batch_size)
@@ -104,7 +106,7 @@ class TBMetricCB(TrackResultsCB):
 
         if self.valid_dice2 > self.max_dice:
             self.max_dice = self.valid_dice2
-            if self.max_dice > .9:
+            if self.max_dice > .91:
                 chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
                 if chpt_cb is not None: chpt_cb.do_saving(f'cmax_{round(self.max_dice, 4)}')
             
@@ -215,47 +217,42 @@ class SelectiveTrainCB(sh.callbacks.Callback):
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
-        self.scaler = torch.cuda.amp.GradScaler() 
-
-    def before_fit(self): 
-        assert self.kwargs['cfg'].TRAIN.AMP
 
     @sh.utils.on_train
     def before_epoch(self):
-        #print('SCALE:', self.scaler.get_scale())
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
     
     def train_step(self):
-        xb, yb = self.batch
-        with torch.cuda.amp.autocast(enabled=False):
-            self.learner.preds = self.model(xb)
-            self.learner.loss = self.loss_func(self.preds, yb)
+        xb, yb = get_xb_yb(self.batch)
+        border = get_tag(self.batch) 
+        self.learner.preds = self.model(xb)
+        loss = self.loss_func(self.preds, yb, reduction='none')
+        if border is not None:
+            #print(border.shape, border.sum(), border.max(), yb.sum(), yb.max())
+            mask = border > 0
+            loss[mask] = 0
+
+        self.learner.loss = loss.mean()
 
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
         self.learner.loss.backward()
         self.learner.opt.step()
-        #self.scaler.scale(self.learner.loss).backward()
-        #self.scaler.step(self.learner.opt)
-        #self.scaler.update()
-        #print('SCALE:', self.scaler.get_scale())
         self.learner.opt.zero_grad(set_to_none=True)
+
+        if self.kwargs['cfg'].TRAIN.EMA: self.learner.model_ema.update(self.model)
 
 
 class TrainSSLCB(sh.callbacks.Callback):
     def __init__(self, ssl_dl, logger=None): 
         sh.utils.store_attr(self, locals())
-        #self.scaler = torch.cuda.amp.GradScaler() 
-        self.epoch_start_ssl = 40
+        self.epoch_start_ssl = 10
+        #self.ssl_criterion = loss.symmetric_lovasz
         self.ssl_criterion = torch.nn.BCEWithLogitsLoss()
-        self.ssl_loss_scale = 2
-
-    def before_fit(self): 
-        assert self.kwargs['cfg'].TRAIN.AMP
-        #import torch_ema
-        #self.ema = torch_ema.ExponentialMovingAverage(self.model.parameters(), decay=0.995)
-
+        self.ssl_loss_scale = 1
+        self.high_thr = .8
+        self.low_thr = .2
 
     @sh.utils.on_train
     def before_epoch(self):
@@ -265,52 +262,53 @@ class TrainSSLCB(sh.callbacks.Callback):
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
 
+    def ssl_step(self):
+        ssl_loss = None
+        if self.n_epoch >= self.epoch_start_ssl:
+            try:
+                xb, yb = get_xb_yb(next(self.ssl_it))
+            except StopIteration:
+                print('maxit:', self.np_batch)
+                return None
+
+            xb = xb.cuda()
+            with torch.no_grad():
+                self.learner.model_ema.eval()
+                ssl_preds = self.learner.model_ema.module(yb.cuda()).sigmoid()
+                self.learner.model_ema.train()
+                #preds = self.model(yb.cuda()).sigmoid()
+                mask = (ssl_preds < self.low_thr) +  (ssl_preds > self.high_thr) # TODO blur? ema?
+                ssl_preds_confident = ssl_preds[mask]
+
+            preds = self.model(xb)
+            preds_gt = preds[mask]
+            if self.np_batch > .9 and np.random.random() > .5: 
+                # Randomly drop results to TB
+                #print(xbs.shape, ybs.shape, preds.shape)
+                self.learner.batch = (xb,ssl_preds)
+                self.learner.preds = preds
+
+            ssl_loss = self.ssl_criterion(preds_gt, ssl_preds_confident) * self.ssl_loss_scale
+
+        return ssl_loss
+
     def train_step(self):
-        xb, yb = self.batch
+        xb, yb = get_xb_yb(self.batch)
+        self.learner.preds = self.model(xb)
+        base_loss = self.loss_func(self.learner.preds, yb)
+        ssl_loss = self.ssl_step()
 
-        with torch.cuda.amp.autocast(enabled=False):
-            self.learner.preds = self.model(xb)
-            loss1 = self.loss_func(self.learner.preds, yb)
+        if ssl_loss is not None:
+            self.log_debug(f'BASE: {base_loss.item()}, SSL:{ssl_loss.item()}')
+            loss = (base_loss + ssl_loss) / 2
+        else: loss = base_loss
 
-            ssl_loss = None
-            if self.n_epoch >= self.epoch_start_ssl:
-                try:
-                    xbs, ybs = next(self.ssl_it)
-                    xbs = xbs.cuda()
-                    with torch.no_grad():
-                        #self.ema.update(self.model.parameters())
-                        ybs = self.model(ybs.cuda()).sigmoid()
-                        mask = (ybs < .1 ) +  (ybs > .8) # TODO blur? ema?
-                        ybs_m = ybs[mask]
-
-                    preds = self.model(xbs)
-                    preds_m = preds[mask]
-                    if self.np_batch > .9 and np.random.random() > .5: 
-                        #print(xbs.shape, ybs.shape, preds.shape)
-                        self.learner.batch = (xbs,ybs)
-                        self.learner.preds = preds
-
-                    ssl_loss = self.ssl_criterion(preds_m, ybs_m) * self.ssl_loss_scale
-
-                except StopIteration:
-                    print('maxit:', self.np_batch)
-                    pass
-
-            if ssl_loss is not None:
-                print(loss1.item(), ssl_loss.item())
-                loss = (loss1 + ssl_loss) / 2
-            else:
-                loss = loss1
-
-            self.learner.loss = loss
-            
         loss.backward()
+        self.learner.loss = loss
         self.learner.opt.step()
-        #self.scaler.scale(loss).backward()
-        #self.scaler.step(self.learner.opt)
-        #self.scaler.update()
+        self.learner.opt.zero_grad(set_to_none=True)
 
-        self.learner.opt.zero_grad()
+        if self.kwargs['cfg'].TRAIN.EMA: self.learner.model_ema.update(self.model, self.kwargs['cfg'].TRAIN.EMA)
 
 
 class ValCB(sh.callbacks.Callback):
@@ -338,7 +336,7 @@ class ValCB(sh.callbacks.Callback):
 
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.35).float()
+            p = (p>.5).float()
             dice = loss.dice_loss(p, yb.cpu().float())
             #dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
@@ -346,7 +344,7 @@ class ValCB(sh.callbacks.Callback):
             self.learner.extra_samples_count.append(batch_size)
 
     def val_step(self):
-        xb, yb = self.batch
+        xb, yb = get_xb_yb(self.batch)
         with torch.no_grad():
             #with torch.cuda.amp.autocast():
             self.learner.preds = self.model(xb)
@@ -354,25 +352,13 @@ class ValCB(sh.callbacks.Callback):
                 
 
 class ValEMACB(sh.callbacks.Callback):
-    def __init__(self, decay=.9, logger=None):
+    def __init__(self, model_ema, logger=None):
         sh.utils.store_attr(self, locals())
         self.evals = []
-        self.decay = decay
-        self.dice = 0
-        self.max_dice = .1
 
-    def before_fit(self): self.learner.model_ema = ema.ModelEmaV2(self.model, decay=self.decay)
+    def before_fit(self):
+        self.learner.model_ema = self.model_ema
 
-    @sh.utils.on_train
-    def after_epoch(self): 
-        decay=self.decay
-        if self.dice > self.max_dice:
-            self.max_dice = self.dice
-            self.dice = 0
-            decay = .7
-        #self.log_debug(f'EMA update: decay {decay}')
-        self.learner.model_ema.update(self.model, decay)
- 
     @sh.utils.on_validation
     def before_epoch(self):
         self.run_ema_valid()
@@ -386,22 +372,22 @@ class ValEMACB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
 
             with torch.no_grad():
-                preds = self.learner.model_ema.module(xb)
+                preds = self.learner.model_ema.module(xb.cuda())
 
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.35).float()
-            dice = loss.dice_loss(p, yb.cpu().float())
+            p = (p>.5).float()
+            dice = loss.dice_loss(p, yb.float())
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
 
-        self.dice = (np.array(self.learner.extra_accs) / np.array(self.learner.extra_samples_count)).mean()
 
     def val_step(self):
-        xb, yb = self.batch
+        xb, yb = get_xb_yb(self.batch)
         with torch.no_grad():
             self.learner.preds = self.model(xb)
             self.learner.loss = self.loss_func(self.preds, yb)
                 
+
 def get_cb_by_instance(cbs, cls):
     for cb in cbs:
         if isinstance(cb, cls): return cb
@@ -419,13 +405,13 @@ class CheckpointCB(sh.callbacks.Callback):
         self.pct_counter = None if isinstance(self.save_step, int) else self.save_step
         
     def do_saving(self, val=''):
-        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema.module)
+        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema)
         postfix = 'ema_' if self.ema else ''
         torch.save({
                 'epoch': self.n_epoch,
                 'loss': self.loss,
                 'model_state': state_dict,
-                'opt_state':self.opt.state_dict(),                    
+                'opt_state':self.opt.state_dict(), 
             }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{postfix}{val}.pth'))
 
     def after_epoch(self):

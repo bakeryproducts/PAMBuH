@@ -92,10 +92,10 @@ def dump_to_csv(results, dst_path, threshold):
     df.to_csv(dst_path + f'submission__{int(threshold)}.csv')
 
 
-def mask_q_writer(q, H, W, batch_size, total_blocks, root, pad, result):
+def mask_q_writer(q, H, W, batch_size, total_blocks, root, pad, use_tta, result):
     import infer
 
-    do_inference = infer.get_infer_func(root, use_tta=True)
+    do_inference = infer.get_infer_func(root, use_tta=use_tta)
     mask = np.zeros((1,H,W)).astype(np.uint8)
     count = 0
     batch = []
@@ -125,7 +125,7 @@ def mask_q_writer(q, H, W, batch_size, total_blocks, root, pad, result):
     return
 
 
-def launch_mpq(img_name, model_folder, batch_size, block_size, pad, num_processes, qsize):
+def launch_mpq(img_name, model_folder, batch_size, block_size, pad, num_processes, qsize, use_tta):
     m = mp.Manager()
     result = m.dict()
     q = m.Queue(maxsize=qsize)
@@ -137,7 +137,7 @@ def launch_mpq(img_name, model_folder, batch_size, block_size, pad, num_processe
     reader = partial(mp_func_wrapper, image_q_reader)
     
     writer = partial(mp_func_wrapper, mask_q_writer)
-    writer_p = mp.Process(target=writer, args=((q,H,W, batch_size, total_blocks, model_folder, pad, result),))
+    writer_p = mp.Process(target=writer, args=((q,H,W, batch_size, total_blocks, model_folder, pad, use_tta, result),))
     writer_p.start()        
     
     with mp.Pool(num_processes) as p:    
@@ -168,13 +168,12 @@ def gpu_select(gpus):
         if gpu is not None: break
     return gpu
             
+def start(img_name, gpus, model_folder, threshold, results,
+            save_predicts=False, join_predicts=False, do_filtering=False, use_tta=True, to_rle=True):
 
-def start(img_name, gpus, model_folder, threshold, results):
     random.seed(hash(str(img_name)))
     gpu = gpu_select(gpus)
     logger.log('DEBUG', f'Starting inference {img_name} on GPU {gpu}')
-    #logger.log('DEBUG', f'{gpu}, {gpus}')
-
     os.environ['CPL_LOG'] = '/dev/null'
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
@@ -184,9 +183,6 @@ def start(img_name, gpus, model_folder, threshold, results):
     pad = 1024
     num_processes = 4
     qsize = 24
-    save_predicts = True
-    join_predicts = False
-    do_filtering = False
 
     mask = launch_mpq(str(img_name),
                         model_folder, 
@@ -194,7 +190,8 @@ def start(img_name, gpus, model_folder, threshold, results):
                         block_size=block_size, 
                         pad=pad, 
                         num_processes=num_processes, 
-                        qsize=qsize)
+                        qsize=qsize,
+                        use_tta=use_tta)
 
     if do_filtering: mask = filter_mask(mask, img_name)
     mask[mask<threshold] = 0
@@ -206,12 +203,15 @@ def start(img_name, gpus, model_folder, threshold, results):
             merge_name = dst/'merged'/img_name.name
             utils.tiff_merge_mask(img_name, str(out_name), merge_name)
 
-    logger.log('DEBUG', f'{img_name} done, to RLE:')
-    mask = mask.clip(0,1)
-    rle = rle2tiff.mask2rle(mask)
-
-    results[img_name] = rle
-    gpus[gpu] = False # Release gpu idx after usage
+    logger.log('DEBUG', f'{img_name} done')
+    if to_rle:
+        logger.log('DEBUG', f'{img_name} done')
+        mask = mask.clip(0,1)
+        rle = rle2tiff.mask2rle(mask)
+        results[img_name] = rle
+    else:
+        results[img_name] = mask
+    if not isinstance(gpus, list): gpus[gpu] = False # Release gpu idx after usage
 
 if __name__ == '__main__':
     # Single process run, mp in run_inference

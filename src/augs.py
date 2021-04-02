@@ -11,11 +11,11 @@ class ToTensor(albu_pt.ToTensorV2):
     def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
 
 class Augmentator:
-    def __init__(self, cfg):
+    def __init__(self, cfg, compose):
         self.cfg = cfg 
         self.resize_w, self.resize_h = self.cfg['RESIZE']
         self.crop_w, self.crop_h = self.cfg['CROP']
-        self.compose = albu.Compose
+        self.compose = compose
         
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
@@ -96,10 +96,11 @@ class Augmentator:
     def aug_blank(self): return self.compose([self.resize()])
     def aug_test(self): return self.compose([self.resize(), self.norm()])
 
-def get_aug(aug_type, transforms_cfg):
+def get_aug(aug_type, transforms_cfg, border=False):
     """ aug_type (str): one of `val`, `test`, `light`, `medium`, `hard`
         transforms_cfg (dict): part of main cfg
     """
-    auger = Augmentator(cfg=transforms_cfg)
+    compose = albu.Compose if not border else partial(albu.Compose, additional_targets={'mask1':'mask', 'mask2':'mask'})
+    auger = Augmentator(cfg=transforms_cfg, compose=compose)
     return auger.get_aug(aug_type)
 

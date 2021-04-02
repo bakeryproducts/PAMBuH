@@ -21,18 +21,14 @@ class GdalSampler:
                  mask_path: str,
                  img_polygons_path: str,
                  img_wh: Tuple[int, int],
-                 mask_wh: Tuple[int, int],
-                 rand_shift_range: Tuple[int, int] = (0, 0),
-                 num_out_mask_bands: int = 1,
-                 num_out_img_bands: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+                 border_path=None,
+                 rand_shift_range: Tuple[int, int] = (0, 0)) -> Tuple[np.ndarray, np.ndarray]:
         """If rand_shift_range ~ (0,0), then centroid of glomerulus corresponds centroid of output sample
         """
-
-
-        assert img_wh == mask_wh, "Image and mask wh should be identical"
         self._records_json = jread(img_polygons_path)
-        self._mask = RasterioReader(mask_path, num_out_mask_bands)
-        self._img = RasterioReader(img_path, num_out_img_bands)
+        self._mask = rasterio.open(mask_path)
+        self._img = rasterio.open(img_path)
+        self._border = rasterio.open(border_path) if border_path is not None else None
         self._wh = img_wh
         self._count = -1
         self._rand_shift_range = rand_shift_range
@@ -58,9 +54,12 @@ class GdalSampler:
         y,x = self._polygons_centroid[idx]
         w,h = self._wh
         y,x = y-h//2, x-w//2 # align center of crop with poly
-        window = ((x, x+w), (y, y+h))
+        window = ((x, x+w),(y, y+h))
         img = self._img.read(window=window, boundless=True)
         mask = self._mask.read(window=window, boundless=True)
+        if self._border is not None:
+            return img, mask, self._border.read(window=window, boundless=True)
+
         return img, mask
 
     def __del__(self):
@@ -82,6 +81,7 @@ class BackgroundSampler:
                  max_trials: int = 25,
                  mask_glom_val: int = 255,
                  buffer_dist: int = 0,
+                 border_path=None,
                  num_out_mask_bands: int = 1,
                  num_out_img_bands: int = 3) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -97,6 +97,7 @@ class BackgroundSampler:
         self._mask = RasterioReader(mask_path, num_out_mask_bands)
         self.mask_path = mask_path
         self._img = RasterioReader(img_path, num_out_img_bands)
+        self._border = rasterio.open(border_path) if border_path is not None else None
         self._polygons = [poly.buffer(buffer_dist) for poly in polygons] if polygons else None # Dilate if any
         self._w, self._h = img_wh
         self._num_samples = num_samples
@@ -161,6 +162,8 @@ class BackgroundSampler:
         window = Window(x_off, y_off, self._w, self._h)
         img = self._img.read(window=window, boundless=self._boundless)
         mask = self._mask.read(window=window, boundless=self._boundless)
+        if self._border is not None:
+            return img, mask, self._border.read(window=window, boundless=True)
         return img, mask
 
     def __del__(self):

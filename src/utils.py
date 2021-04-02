@@ -105,11 +105,11 @@ def get_tiff_block(ds, x, y, w, h=None, bands=3):
     if h is None: h = w
     return ds.read(list(range(1, bands+1)), window=rasterio.windows.Window(x, y, w, h))
 
-def save_tiff_uint8_single_band(img, path):
+def save_tiff_uint8_single_band(img, path, bits=1):
     assert img.dtype == np.uint8
     if img.max() <= 1. : print(f"Warning: saving tiff with max value is <= 1, {path}")
     h, w = img.shape
-    dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=1, dtype=np.uint8)
+    dst = rasterio.open(path, 'w', driver='GTiff', height=h, width=w, count=1, nbits=bits, dtype=np.uint8)
     dst.write(img, 1)
     dst.close()
     del dst
@@ -167,19 +167,21 @@ def tiff_merge_mask(path_tiff, path_mask, path_dst, path_mask2=None):
     # will use shitload of mem
     img = rasterio.open(path_tiff).read()
     mask = rasterio.open(path_mask).read()
-    assert mask.max() <= 1 + 1e-6
+    #assert mask.max() <= 1 + 1e-6
 
     if img.shape[0] == 1:
         img = np.repeat(img, 3, 0)
 
 
+    red = mask * 200 if mask.max() <= 1 + 1e-6 else mask
     img[1,...] = img.mean(0)
-    img[0,...] = mask*200
+    img[0,...] = red
 
     if path_mask2 is not None:
         mask2 = rasterio.open(path_mask2).read()
-        assert mask2.max() <= 1 + 1e-6
-        img[2,...] = mask2*200
+        blue = mask2 * 200 if mask2.max() <= 1 + 1e-6 else mask2
+        #assert mask2.max() <= 1 + 1e-6
+        img[2,...] = blue
 
     _, h, w = img.shape
     dst = rasterio.open(path_dst, 'w', driver='GTiff', height=h, width=w, count=3, dtype=np.uint8)

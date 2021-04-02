@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     """
     #model_folder = 'output/925/'
-    model_folder = 'output/2021_Mar_30_23_44_48_PAMBUH/'
+    model_folder = 'output/2021_Mar_31_22_57_28_PAMBUH/'
     gpu_list = [0,1,2,3]
     threshold = int(.35 * 255)
     num_processes = len(gpu_list)
@@ -36,6 +36,24 @@ if __name__ == '__main__':
     img_names = list(Path('input/hm/test').glob('*.tiff'))
     img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
     #img_names = img_names[:2]
+
+    save_predicts=True
+    use_tta=True
+    to_rle=True
+
+    results = start_inf(model_folder,
+                        img_names,
+                        gpu_list,
+                        threshold,
+                        num_processes,
+                        save_predicts,
+                        use_tta,
+                        to_rle)
+
+    dump_to_csv(results, model_folder, threshold)
+
+
+def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_predicts, use_tta, to_rle):
     logger.log('DEBUG', '\n'.join(list([str(i) for i in img_names])))
 
     m = mp.Manager()
@@ -44,7 +62,15 @@ if __name__ == '__main__':
     for i in gpu_list:
         gpus[i] = False
 
-    starter = partial(start, model_folder=model_folder, threshold=threshold, gpus=gpus, results=results)
+    starter = partial(start, 
+                        model_folder=model_folder,
+                        threshold=threshold,
+                        gpus=gpus,
+                        results=results,
+                        save_predicts=save_predicts,
+                        use_tta=use_tta,
+                        to_rle=to_rle)
+
     starter = partial(mp_func_wrapper, starter)
     args = [(name,) for name in img_names]
 
@@ -52,5 +78,5 @@ if __name__ == '__main__':
         g = tqdm(p.imap(starter, args), total=len(img_names))
         for _ in g:
             pass
-    
-    dump_to_csv(results, model_folder, threshold)
+
+    return results 

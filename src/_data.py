@@ -64,6 +64,20 @@ class PairDataset:
     def __getitem__(self, idx):
         return self.ds1.__getitem__(idx), self.ds2.__getitem__(idx) 
 
+class TripleDataset:
+    def __init__(self, ds1, ds2, ds3):
+        self.ds1, self.ds2, self.ds3 = ds1, ds2, ds3
+        self.check_len()
+    
+    def __len__(self): return len(self.ds1)
+    def check_len(self): 
+        assert len(self.ds1) == len(self.ds2)
+        assert len(self.ds1) == len(self.ds3)
+    
+    def __getitem__(self, idx):
+        return self.ds1.__getitem__(idx), self.ds2.__getitem__(idx), self.ds3.__getitem__(idx)
+
+
 class MultiplyDataset:
     def __init__(self, dataset, rate):
         _dataset = TorchConcatDataset([dataset])
@@ -126,18 +140,20 @@ class TransformDataset:
     
     def __len__(self): return len(self.dataset)
 
-class TransformTagDataset:
+class BorderTransformDataset:
     def __init__(self, dataset, transforms):
         self.dataset = dataset
         self.transforms = albu.Compose([]) if transforms is None else transforms
     
     def __getitem__(self, idx):
-        img, (mask, cl_id) = self.dataset.__getitem__(idx)
-        augmented = self.transforms(image=img, mask=mask)
-        amask = augmented["mask"][0]# as binary
+        img, mask, border = self.dataset.__getitem__(idx)
+        augmented = self.transforms(image=img, mask1=mask, mask2=border)
+        amask = augmented["mask1"][0]# as binary
         amask = amask.view(1,*amask.shape)
+        aborder = augmented["mask2"][0]# as binary
+        aborder = aborder.view(1,*aborder.shape)
 
-        return augmented["image"], amask, cl_id
+        return augmented["image"], amask, aborder
     
     def __len__(self): return len(self.dataset)
 

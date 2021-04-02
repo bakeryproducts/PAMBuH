@@ -14,7 +14,7 @@ import utils
 import shallow as sh
 from logger import logger
 from config import cfg, cfg_init
-from model import build_model
+from model import build_model, wrap_ddp
 from callbacks import *
 
 
@@ -28,16 +28,6 @@ def clo(logits, targets, reduction='none'):
     return l1*w1 #+ l2*w2
     #return  l2*w2
 
-def lovedge(logits, targets, edgeloss, **kwargs):
-    w1 = .1
-    w2 = (1 - w1) * 4
-    #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
-    l1 = loss.symmetric_lovasz(logits, targets)
-    l2 = edgeloss(logits, targets)
-    #print(l1,l2)
-    #if reduction == 'none': l2 = l2.mean((1,2,3))
-    #print(l1.item(), l2.item())
-    return l2 * w2 + l1 * w1
 
 def start(cfg, output_folder):
     datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
@@ -57,18 +47,20 @@ def start(cfg, output_folder):
 
 def start_fold(cfg, output_folder, datasets):
     n_epochs = cfg.TRAIN.EPOCH_COUNT
-    selective = False#cfg.TRAIN.SELECTIVE_BP <= 1. - 1e-6
+    selective = False
     dls = data.build_dataloaders(cfg, datasets, selective=selective)
     model, opt = build_model(cfg)
+    model_ema = ema.ModelEmaV2(model, decay=cfg.TRAIN.EMA)
+    model = wrap_ddp(cfg, model)
 
-    criterion = partial(clo, reduction=('none' if selective else 'mean'))
+    #criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = loss.focal_loss
-    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
+    criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) 
     #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 
-    val_cb = ValEMACB(logger=logger) if cfg.TRAIN.EMA else ValCB(logger=logger)
+    val_cb = ValEMACB(model_ema=model_ema, logger=logger) if cfg.TRAIN.EMA else ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
         utils.dump_params(cfg, output_folder)

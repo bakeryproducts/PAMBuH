@@ -19,14 +19,14 @@ class GdalSampler:
                  mask_path: str,
                  img_polygons_path: str,
                  img_wh: Tuple[int, int],
-                 mask_wh: Tuple[int, int],
+                 border_path=None,
                  rand_shift_range: Tuple[int, int] = (0, 0)) -> Tuple[np.ndarray, np.ndarray]:
         """If rand_shift_range ~ (0,0), then centroid of glomerulus corresponds centroid of output sample
         """
-        assert img_wh == mask_wh, "Image and mask wh should be identical"
         self._records_json = jread(img_polygons_path)
         self._mask = rasterio.open(mask_path)
         self._img = rasterio.open(img_path)
+        self._border  = rasterio.open(border_path) if border_path is not None else None
         self._wh = img_wh
         self._count = -1
         self._rand_shift_range = rand_shift_range
@@ -55,6 +55,9 @@ class GdalSampler:
         window = ((x, x+w),(y, y+h))
         img = self._img.read(window=window, boundless=True)
         mask = self._mask.read(window=window, boundless=True)
+        if self._border is not None:
+            return img, mask, self._border.read(window=window, boundless=True)
+
         return img, mask
 
     def __del__(self):
@@ -75,7 +78,8 @@ class BackgroundSampler:
                  step: int = 25,
                  max_trials: int = 25,
                  mask_glom_val: int = 255,
-                 buffer_dist: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+                 buffer_dist: int = 0,
+                 border_path=None) -> Tuple[np.ndarray, np.ndarray]:
         """
            max_trials: max number of trials per one iteration
            step: num of glomeruli between iterations
@@ -89,6 +93,7 @@ class BackgroundSampler:
         self._mask = rasterio.open(mask_path)
         self.mask_path = mask_path
         self._img = rasterio.open(img_path)
+        self._border  = rasterio.open(border_path) if border_path is not None else None
         self._polygons = [poly.buffer(buffer_dist) for poly in polygons] if polygons else None # Dilate if any
         self._w, self._h = img_wh
         self._num_samples = num_samples
@@ -154,6 +159,8 @@ class BackgroundSampler:
         window= Window(x_off, y_off, self._w, self._h)
         img = self._img.read(window=window, boundless=self._boundless)
         mask = self._mask.read(window=window, boundless=self._boundless)
+        if self._border is not None:
+            return img, mask, self._border.read(window=window, boundless=True)
         return img, mask
 
     def __del__(self):

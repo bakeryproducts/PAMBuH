@@ -78,21 +78,21 @@ def build_model(cfg):
         #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
 
     model = model.cuda()
+    opt = optim.AdamW
+    opt_kwargs = {}
+    optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
+    model.train()
+    return model, optimizer
+
+def wrap_ddp(cfg, model):
     if cfg.PARALLEL.DDP: 
         #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = DistributedDataParallel(model, 
                                     device_ids=[cfg.PARALLEL.LOCAL_RANK],
                                     find_unused_parameters=False,
-                                    broadcast_buffers=True)
+                                    broadcast_buffers=False)
+    return model
 
-    opt = optim.AdamW
-    #opt = optim.SGD
-    #opt_kwargs = {'momentum': .9, 'weight_decay':1e-2}
-    opt_kwargs = {}
-    optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
-
-    model.train()
-    return model, optimizer
 
 def load_model(cfg, model_folder_path, eval_mode=True):
     print(model_folder_path)

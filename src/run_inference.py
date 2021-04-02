@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     """
     #model_folder = 'output/925/'
-    model_folder = 'output/2021_Mar_30_23_44_48_PAMBUH/'
+    model_folder = 'output/2021_Mar_31_22_57_28_PAMBUH/'
     gpu_list = [0,1,2,3]
     threshold = int(.35 * 255)
     num_processes = len(gpu_list)

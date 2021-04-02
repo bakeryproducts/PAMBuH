@@ -7,7 +7,7 @@ from functools import partial
 import rasterio
 from shapely import geometry
 from rasterio.windows import Window
-from rasterio_reader import RasterioReader
+from tf_reader import TFReader
 
 
 from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist, get_cortex_polygons, gen_pt_in_poly
@@ -81,9 +81,7 @@ class BackgroundSampler:
                  max_trials: int = 25,
                  mask_glom_val: int = 255,
                  buffer_dist: int = 0,
-                 border_path=None,
-                 num_out_mask_bands: int = 1,
-                 num_out_img_bands: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+                 border_path=None) -> Tuple[np.ndarray, np.ndarray]:
         """
            max_trials: max number of trials per one iteration
            step: num of glomeruli between iterations
@@ -94,9 +92,9 @@ class BackgroundSampler:
             polygons = utils.get_cortex_polygons(utils.jread(img_anot_struct_path))
         """
 
-        self._mask = RasterioReader(mask_path, num_out_mask_bands)
+        self._mask = TFReader(mask_path)
         self.mask_path = mask_path
-        self._img = RasterioReader(img_path, num_out_img_bands)
+        self._img = TFReader(img_path)
         self._border = rasterio.open(border_path) if border_path is not None else None
         self._polygons = [poly.buffer(buffer_dist) for poly in polygons] if polygons else None # Dilate if any
         self._w, self._h = img_wh

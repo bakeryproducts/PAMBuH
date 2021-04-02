@@ -361,7 +361,7 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
         datasets = apply_transforms_datasets(datasets, transforms)
         return datasets
 
-def build_dataloaders(cfg, datasets, selective=True):
+def build_dataloaders(cfg, datasets, selective=False):
     '''
         Builds dataloader from datasets dictionary {'TRAIN':ds1, 'VALID':ds2}
         dataloaders :
@@ -377,24 +377,23 @@ def build_dataloaders(cfg, datasets, selective=True):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = True
+    drop_last = mode == 'TRAIN'
     sampler = None 
 
-    if selective:
-        weights = torch.ones(len(dataset))
-        sampler = SelectiveSampler(weights) 
 
     if cfg.PARALLEL.DDP and mode == 'TRAIN':
         if sampler is None:
             sampler = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
 
-    shuffle = sampler is None
+    num_workers = cfg.TRAIN.NUM_WORKERS 
+    if mode == 'TRAIN': shuffle = sampler is None
+    else: shuffle = False
 
     dl = DataLoader(
         dataset,
         batch_size=cfg[mode]['BATCH_SIZE'],
         shuffle=shuffle,
-        num_workers=cfg.TRAIN.NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
         drop_last=drop_last,
         collate_fn=None,

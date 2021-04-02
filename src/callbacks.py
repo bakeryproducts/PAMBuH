@@ -65,7 +65,7 @@ class TrackResultsCB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
             #print(self.preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(self.preds)
-            p = (p>.35)
+            p = (p>.5)
             dice = loss.dice_loss(p.float(), yb.float())
             #print(n, dice, dice*n)
             self.accs.append(dice * batch_size)
@@ -336,7 +336,7 @@ class ValCB(sh.callbacks.Callback):
 
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.35).float()
+            p = (p>.5).float()
             dice = loss.dice_loss(p, yb.cpu().float())
             #dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
             #print(n, dice, dice*n)
@@ -375,7 +375,7 @@ class ValEMACB(sh.callbacks.Callback):
                 preds = self.learner.model_ema.module(xb.cuda())
 
             p = torch.sigmoid(preds.cpu().float())
-            p = (p>.35).float()
+            p = (p>.5).float()
             dice = loss.dice_loss(p, yb.float())
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
@@ -405,13 +405,13 @@ class CheckpointCB(sh.callbacks.Callback):
         self.pct_counter = None if isinstance(self.save_step, int) else self.save_step
         
     def do_saving(self, val=''):
-        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema.module)
+        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema)
         postfix = 'ema_' if self.ema else ''
         torch.save({
                 'epoch': self.n_epoch,
                 'loss': self.loss,
                 'model_state': state_dict,
-                'opt_state':self.opt.state_dict(),                    
+                'opt_state':self.opt.state_dict(), 
             }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{postfix}{val}.pth'))
 
     def after_epoch(self):

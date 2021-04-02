@@ -203,3 +203,8 @@ def gen_pt_in_poly(polygon: geometry.Polygon,
         num_attempts += 1
     return polygon.centroid
 
+
+def rgb2gray(rgb):
+    """Returns gray scale image"""
+    return np.dot(rgb[:3, ...], [0.299, 0.587, 0.144])
+

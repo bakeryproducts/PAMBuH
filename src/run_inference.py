@@ -22,37 +22,6 @@ class NoDaemonProcess(mp.Process):
 class MyPool(mp.pool.Pool):
     Process = NoDaemonProcess
 
-if __name__ == '__main__':
-    """
-        MP GPU inference
-
-    """
-    #model_folder = 'output/925/'
-    model_folder = 'output/2021_Mar_31_22_57_28_PAMBUH/'
-    gpu_list = [0,1,2,3]
-    threshold = int(.35 * 255)
-    num_processes = len(gpu_list)
-
-    img_names = list(Path('input/hm/test').glob('*.tiff'))
-    img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
-    #img_names = img_names[:2]
-
-    save_predicts=True
-    use_tta=True
-    to_rle=True
-
-    results = start_inf(model_folder,
-                        img_names,
-                        gpu_list,
-                        threshold,
-                        num_processes,
-                        save_predicts,
-                        use_tta,
-                        to_rle)
-
-    dump_to_csv(results, model_folder, threshold)
-
-
 def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_predicts, use_tta, to_rle):
     logger.log('DEBUG', '\n'.join(list([str(i) for i in img_names])))
 
@@ -80,3 +49,33 @@ def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_
             pass
 
     return results 
+
+if __name__ == '__main__':
+    """
+        MP GPU inference
+
+    """
+    #model_folder = 'output/925/'
+    model_folder = 'output/2021_Apr_02_18_16_30_PAMBUH/'
+    gpu_list = [0,2]
+    threshold = int(.62 * 255)
+    num_processes = len(gpu_list)
+
+    img_names = list(Path('input/hm/test').glob('*.tiff'))
+    img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
+    #img_names = img_names[:2]
+
+    save_predicts=True
+    use_tta=True
+    to_rle=True
+
+    results = start_inf(model_folder,
+                        img_names,
+                        gpu_list,
+                        threshold,
+                        num_processes,
+                        save_predicts,
+                        use_tta,
+                        to_rle)
+
+    dump_to_csv(results, model_folder, threshold)

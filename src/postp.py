@@ -205,7 +205,7 @@ def start(img_name, gpus, model_folder, threshold, results,
 
     logger.log('DEBUG', f'{img_name} done')
     if to_rle:
-        logger.log('DEBUG', f'{img_name} done')
+        logger.log('DEBUG', f'RLE...')
         mask = mask.clip(0,1)
         rle = rle2tiff.mask2rle(mask)
         results[img_name] = rle

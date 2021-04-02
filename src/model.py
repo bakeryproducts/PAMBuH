@@ -51,12 +51,12 @@ def model_select():
 # 'timm-regnety_040', 'timm-regnety_064', 'timm-regnety_080', 'timm-regnety_120', 'timm-regnety_160', 'timm-regnety_320',
 # 'timm-skresnet18', 'timm-skresnet34', 'timm-skresnext50_32x4d']
 
-    #model = smp.manet.MAnet
+    model = smp.manet.MAnet
     #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b4')
     #model = partial(smp.manet.MAnet, encoder_name='resnext50_32x4d')
     #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_032')
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
-    model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
+    #model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
 

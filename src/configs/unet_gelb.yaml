@@ -12,7 +12,7 @@ DATA:
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
-    MULTIPLY: {'rate':1}
+    MULTIPLY: {'rate':2}
   VALID:
     DATASETS: ['val_0e']
     #FOLDS: [['val_0e'],['val_2a'],['val_18'],['val_cc']]

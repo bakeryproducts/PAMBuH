@@ -214,6 +214,7 @@ class SelectiveTrainCB(sh.callbacks.Callback):
         #return  (1+l)**2
         return  np.percentile(l.numpy(), l)
 
+
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
@@ -224,11 +225,23 @@ class TrainCB(sh.callbacks.Callback):
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
     
+    def mask_out_border(self, loss, d=32):
+        mask = torch.zeros_like(loss)
+        mask[:,:,:d , :  ] = 1
+        mask[:,:,:  , :d ] = 1
+        mask[:,:,-d:, :  ] = 1
+        mask[:,:,:  , -d:] = 1
+        return mask
+
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
         border = get_tag(self.batch) 
         self.learner.preds = self.model(xb)
         loss = self.loss_func(self.preds, yb, reduction='none')
+
+        border_mask = self.mask_out_border(loss, 32)
+        loss[(border_mask * yb)>0] = 0
+
         if border is not None:
             #print(border.shape, border.sum(), border.max(), yb.sum(), yb.max())
             mask = border > 0

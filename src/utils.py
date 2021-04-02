@@ -204,7 +204,24 @@ def gen_pt_in_poly(polygon: geometry.Polygon,
     return polygon.centroid
 
 
-def rgb2gray(rgb):
-    """Returns gray scale image"""
-    return np.dot(rgb[:3, ...], [0.299, 0.587, 0.144])
+def rgb2gray(rgb: np.ndarray) -> np.ndarray:
+    """Gets np.ndarray (3, ...) or (..., 3) and returns gray scale np.ndarray (...)."""
+
+    first_channel = rgb.shape[0]
+    if first_channel == 3:
+        rgb = np.swapaxes(np.swapaxes(rgb, 0, 2), 0, 1) # (3, ...) -> (..., 3)
+    return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+
+
+def save_arr_as_tiff(arr: np.ndarray, path: str, nbits: int = 8) -> None:
+    """Gets np.ndarray (num_bands, h, w) and returns gray scale np.ndarray (h, w) in uint8."""
+    
+    num_bands, h, w = arr.shape
+
+    dst = rasterio.open(path, 'w', driver='GTiff',
+                        height=h, width=w, count=num_bands,
+                        nbits=nbits, dtype=np.uint8)
+    dst.write(arr)
+    dst.close()
+    del dst
 

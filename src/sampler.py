@@ -7,6 +7,8 @@ from functools import partial
 import rasterio
 from shapely import geometry
 from rasterio.windows import Window
+from rasterio_reader import RasterioReader
+
 
 from utils import jread, get_basics_rasterio, json_record_to_poly, flatten_2dlist, get_cortex_polygons, gen_pt_in_poly
 
@@ -20,13 +22,17 @@ class GdalSampler:
                  img_polygons_path: str,
                  img_wh: Tuple[int, int],
                  mask_wh: Tuple[int, int],
-                 rand_shift_range: Tuple[int, int] = (0, 0)) -> Tuple[np.ndarray, np.ndarray]:
+                 rand_shift_range: Tuple[int, int] = (0, 0),
+                 num_out_mask_bands: int = 1,
+                 num_out_img_bands: int = 3) -> Tuple[np.ndarray, np.ndarray]:
         """If rand_shift_range ~ (0,0), then centroid of glomerulus corresponds centroid of output sample
         """
+
+
         assert img_wh == mask_wh, "Image and mask wh should be identical"
         self._records_json = jread(img_polygons_path)
-        self._mask = rasterio.open(mask_path)
-        self._img = rasterio.open(img_path)
+        self._mask = RasterioReader(mask_path, num_out_mask_bands)
+        self._img = RasterioReader(img_path, num_out_img_bands)
         self._wh = img_wh
         self._count = -1
         self._rand_shift_range = rand_shift_range
@@ -52,7 +58,7 @@ class GdalSampler:
         y,x = self._polygons_centroid[idx]
         w,h = self._wh
         y,x = y-h//2, x-w//2 # align center of crop with poly
-        window = ((x, x+w),(y, y+h))
+        window = ((x, x+w), (y, y+h))
         img = self._img.read(window=window, boundless=True)
         mask = self._mask.read(window=window, boundless=True)
         return img, mask
@@ -75,7 +81,9 @@ class BackgroundSampler:
                  step: int = 25,
                  max_trials: int = 25,
                  mask_glom_val: int = 255,
-                 buffer_dist: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+                 buffer_dist: int = 0,
+                 num_out_mask_bands: int = 1,
+                 num_out_img_bands: int = 3) -> Tuple[np.ndarray, np.ndarray]:
         """
            max_trials: max number of trials per one iteration
            step: num of glomeruli between iterations
@@ -86,9 +94,9 @@ class BackgroundSampler:
             polygons = utils.get_cortex_polygons(utils.jread(img_anot_struct_path))
         """
 
-        self._mask = rasterio.open(mask_path)
+        self._mask = RasterioReader(mask_path, num_out_mask_bands)
         self.mask_path = mask_path
-        self._img = rasterio.open(img_path)
+        self._img = RasterioReader(img_path, num_out_img_bands)
         self._polygons = [poly.buffer(buffer_dist) for poly in polygons] if polygons else None # Dilate if any
         self._w, self._h = img_wh
         self._num_samples = num_samples

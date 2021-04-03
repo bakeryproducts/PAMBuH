@@ -28,6 +28,10 @@ class TFReader:
                 self.ds.read(window=window, boundless=boundless)
         return output
 
+    @property
+    def shape(self):
+        return self.ds.shape
+
     def __del__(self):
         del self.ds
         if self.is_subsets_avail:

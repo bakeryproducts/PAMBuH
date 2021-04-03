@@ -2,6 +2,7 @@ from functools import partial
 
 import albumentations as albu
 import albumentations.pytorch as albu_pt
+from albumentations.core.transforms_interface import ImageOnlyTransform
 import torch  # to tensor transform
 import numpy as np
 
@@ -9,6 +10,28 @@ import numpy as np
 class ToTensor(albu_pt.ToTensorV2):
     def apply_to_mask(self, mask, **params): return torch.from_numpy(mask).permute((2,0,1))
     def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
+
+
+class AddLightning(ImageOnlyTransform):
+    def __init__(self, alpha, p=.5):
+        super(AddLightning, self).__init__(p=p)
+        self.alpha = alpha
+
+    def apply(self, img, **params):
+        return self._adding_lightning(img, alpha=self.alpha)
+
+    def _adding_lightning(self, img, alpha=0.05):
+        crop_with_light = self._get_random_lightning()  # (4, h, w)
+        assert crop_with_light.shape[
+                   0] == 4, f"Invalid number of bands equal to {crop_with_light.shape[0]}"
+
+        rgb, mask = crop_with_light[:3], crop_with_light[3]   # (3, h, w), (h, w)
+        rgb = rgb * (mask // 255)
+        return img + (alpha * rgb).astype(np.uint8)
+
+    def _get_random_lightning(self):
+        raise NotImplementedError
+
 
 class Augmentator:
     def __init__(self, cfg, compose):

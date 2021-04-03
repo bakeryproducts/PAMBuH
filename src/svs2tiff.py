@@ -1,11 +1,11 @@
 import os
 import numpy as np
-import cv2 as cv
 import rasterio
 from pathlib import Path
+import argparse
 
 
-def save_mask(path):
+def svs2tiff(path):
     svs_files = list((Path(path)).glob('*.svs'))
     for svs_file in svs_files:
         print(f"{svs_file}")
@@ -21,14 +21,16 @@ def save_mask(path):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='SVS path')
+    parser.add_argument('path', type=str, help='SVS path')
+    args = parser.parse_args()
+    svs2tiff(args.path)
+    print(args.path)
+
+
+'''
+if __name__ == '__main__':
     path = 'F:/kaggle/dsmatch/k7nvtgn2x6-3/DATASET_A_DIB'
-    save_mask(path)
+    svs2tiff(path)
 
-
-"""
-for svs_file in svs_files:
-    print(f"{svs_file}")
-    img = cv.imread(f"{svs_file}")
-    img_T = cv.transpose(img)
-    cv.imwrite(f"{path_out}/{svs_file.name}.tiff", img_T)
-"""
+'''

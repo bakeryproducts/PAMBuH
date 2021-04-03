@@ -120,10 +120,10 @@ class _AddOverlayBase(ImageOnlyTransform):
     def alpha_blend(self, src, dst):
         # 3hw + 4hw = 3hw
         # assert shape check
+        # if isinstance(self.alpha, int):
+        # return do cut and paste, mask pixels into crop
         #  |
         # \/ this is wrong, cv2.blendalpha or smth
-        # if isinstance(self.alpha, int):
-            # return do cut and paste, mask pixels into crop
         #rgb = rgb * (mask // 255)
         #return img + (alpha * rgb).astype(np.uint8)
         raise NotImplementedError

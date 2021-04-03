@@ -25,7 +25,7 @@ class Augmentator:
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
-        self.Lightniner = AddLightning(self.cfg.DATA.AUG.LIGHT_PATH, alpha=1)
+        #self.Lightniner = partial(AddLightning, self.cfg.DATA.AUG.LIGHT_PATH, alpha=1)
 
 
     def get_aug(self, kind):
@@ -139,9 +139,7 @@ class AddLightning(_AddOverlayBase):
     def get_lightning(self): return cv2.imread(str(random.choice(self.imgs))) # OR PIL , careful with BGRRGB BS
 
 class AddNoisyPattern(_AddOverlayBase):
-    raise NotImplementedError
-
-
+    pass
 
 
 def get_aug(aug_type, transforms_cfg, border=False):

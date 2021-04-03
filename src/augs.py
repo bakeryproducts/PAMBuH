@@ -1,5 +1,7 @@
+import random
 from functools import partial
 
+import cv2
 import albumentations as albu
 import albumentations.pytorch as albu_pt
 from albumentations.core.transforms_interface import ImageOnlyTransform
@@ -12,26 +14,6 @@ class ToTensor(albu_pt.ToTensorV2):
     def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
 
 
-class AddLightning(ImageOnlyTransform):
-    def __init__(self, alpha, p=.5):
-        super(AddLightning, self).__init__(p=p)
-        self.alpha = alpha
-
-    def apply(self, img, **params):
-        return self._adding_lightning(img, alpha=self.alpha)
-
-    def _adding_lightning(self, img, alpha=0.05):
-        crop_with_light = self._get_random_lightning()  # (4, h, w)
-        assert crop_with_light.shape[
-                   0] == 4, f"Invalid number of bands equal to {crop_with_light.shape[0]}"
-
-        rgb, mask = crop_with_light[:3], crop_with_light[3]   # (3, h, w), (h, w)
-        rgb = rgb * (mask // 255)
-        return img + (alpha * rgb).astype(np.uint8)
-
-    def _get_random_lightning(self):
-        raise NotImplementedError
-
 
 class Augmentator:
     def __init__(self, cfg, compose):
@@ -43,6 +25,9 @@ class Augmentator:
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
+        self.Lightniner = AddLightning(self.cfg.DATA.AUG.LIGHT_PATH, alpha=1)
+
+
     def get_aug(self, kind):
         if kind == 'val': return self.aug_val()
         elif kind == 'val_forced': return self.aug_val_forced()
@@ -106,11 +91,11 @@ class Augmentator:
                                                     #self.scale(),
                                                     self.multi_crop(), 
                                                     self.d4(),
-                                                    self.aug_res(),
+                                                    self.additional_res(),
                                                     self.norm()
                                                     ])
 
-    def aug_res(self):
+    def additional_res(self):
         return self.compose([
                     self.color_jit(),
                     self.cutout(),
@@ -123,6 +108,41 @@ class Augmentator:
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])
     def aug_test(self): return self.compose([self.resize(), self.norm()])
+
+    def share_some_light(self): return self.Lightniner()
+
+class _AddOverlayBase(ImageOnlyTransform):
+    def __init__(self, get_overlay_fn, alpha=1, p=.5):
+        super(_AddOverlayBase, self).__init__(p=p)
+        self.alpha = alpha
+        self.overlay_fn = overlay_fn
+
+    def alpha_blend(self, src, dst):
+        # 3hw + 4hw = 3hw
+        # assert shape check
+        #  |
+        # \/ this is wrong, cv2.blendalpha or smth
+        # if isinstance(self.alpha, int):
+            # return do cut and paste, mask pixels into crop
+        #rgb = rgb * (mask // 255)
+        #return img + (alpha * rgb).astype(np.uint8)
+        raise NotImplementedError
+    
+    def apply(self, img, **params): 
+        return self.alpha_blend(self.get_overlay_fn(), img)
+
+class AddLightning(_AddOverlayBase):
+    def __init__(self, imgs_path, alpha=1, p=.5):
+        super(_AddOverlayBase, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
+        self.imgs = list(Path(imgs_path).glob('*.png'))
+
+    def get_lightning(self): return cv2.imread(str(random.choice(self.imgs))) # OR PIL , careful with BGRRGB BS
+
+class AddNoisyPattern(_AddOverlayBase):
+    raise NotImplementedError
+
+
+
 
 def get_aug(aug_type, transforms_cfg, border=False):
     """ aug_type (str): one of `val`, `test`, `light`, `medium`, `hard`

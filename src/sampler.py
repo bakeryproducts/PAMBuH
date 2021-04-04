@@ -26,9 +26,9 @@ class GdalSampler:
         """If rand_shift_range ~ (0,0), then centroid of glomerulus corresponds centroid of output sample
         """
         self._records_json = jread(img_polygons_path)
-        self._mask = rasterio.open(mask_path)
-        self._img = rasterio.open(img_path)
-        self._border = rasterio.open(border_path) if border_path is not None else None
+        self._mask = TFReader(mask_path)
+        self._img = TFReader(img_path)
+        self._border = TFReader(border_path) if border_path is not None else None
         self._wh = img_wh
         self._count = -1
         self._rand_shift_range = rand_shift_range

@@ -152,7 +152,7 @@ class _AddOverlayBase(ImageOnlyTransform):
         p: probability to apply transform
         """
         if random.random() < p:
-            axes = [(1), (2), (1, 2)]  # Includes h or w
+            axes = [1, 2, (1, 2)]  # Includes h or w
             dst = np.flip(dst, random.choice(axes))
         return dst
 
@@ -167,8 +167,7 @@ class _AddOverlayBase(ImageOnlyTransform):
             dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
         return dst
 
-    def d4(self, dst, p=0.75):
-        return self.rotate90(self.flip(dst, p=p), p=p)
+    def d4(self, dst, p=0.75): return self.rotate90(self.flip(dst, p=p), p=p)
 
 
 class AddLightning(_AddOverlayBase):

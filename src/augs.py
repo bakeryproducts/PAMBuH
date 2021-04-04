@@ -137,15 +137,9 @@ class _AddOverlayBase(ImageOnlyTransform):
             return dst  # Only dst
         else:
             rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)
-            rgb_cut_by_mask = np.multiply(rgb, mask).astype(np.uint8)
-            if 1 - self.alpha < np.finfo(float).eps:
-                return rgb_cut_by_mask  # Only mask in rgb
-            else:
-                return cv2.addWeighted(rgb_cut_by_mask,
-                                       self.alpha,
-                                       dst,
-                                       self.beta,
-                                       self.gamma)
+            blended = cv2.addWeighted(rgb, self.alpha, dst, self.beta, self.gamma)
+            blended_cut_by_mask = np.multiply(blended, mask).astype(np.uint8)
+            return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)
 
     def apply(self, img, **params):
         return self.alpha_blend(self.get_overlay_fn(), img)

@@ -9,6 +9,7 @@ import torch  # to tensor transform
 import numpy as np
 from pathlib import Path
 from PIL import Image
+import random
 
 
 class ToTensor(albu_pt.ToTensorV2):
@@ -124,25 +125,50 @@ class _AddOverlayBase(ImageOnlyTransform):
         self.get_overlay_fn = get_overlay_fn
 
     def alpha_blend(self, src, dst):
-        """Blends src and dst into one.
+        """ Blends src and dst into one.
 
-        src: img shape of (4, c, w) containing mask in last channel/band
-        dst: img shape of (3, c, w)
+        src: img shape of (4, h, w) containing mask in last channel/band
+        dst: img shape of (3, h, w)
         """
 
         assert dst.shape[0] == 3 and src.shape[0] == 4  # c
-        assert dst.shape[1:] == src.shape[1:]  # wh
+        assert dst.shape[1:] == src.shape[1:]  # hw
 
         if self.alpha < np.finfo(float).eps:
             return dst  # Only dst
         else:
-            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)
+            src = self.d4(src)
+            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
             blended = cv2.addWeighted(rgb, self.alpha, dst, self.beta, self.gamma)
             blended_cut_by_mask = np.multiply(blended, mask).astype(np.uint8)
-            return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)
+            return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)  # 3hw
 
     def apply(self, img, **params):
         return self.alpha_blend(self.get_overlay_fn(), img)
+
+    def flip(self, dst, p=0.75):
+        """
+        dst: img with shape of either chw or cwh
+        p: probability to apply transform
+        """
+        if random.random() < p:
+            axes = [(1), (2), (1, 2)]  # Includes h or w
+            dst = np.flip(dst, random.choice(axes))
+        return dst
+
+    def rotate90(self, dst, p=0.75):
+        """
+        dst: img with shape of either chw or cwh
+        p: probability to apply transform
+        """
+        if random.random() < p:
+            num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
+            axes = (1, 2)  # Includes hw
+            dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
+        return dst
+
+    def d4(self, dst, p=0.75):
+        return self.rotate90(self.flip(dst, p=p), p=p)
 
 
 class AddLightning(_AddOverlayBase):

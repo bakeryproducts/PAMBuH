@@ -124,18 +124,16 @@ class _AddOverlayBase(ImageOnlyTransform):
         self.get_overlay_fn = get_overlay_fn
 
     def alpha_blend(self, src, dst):
-        """ Blends src and dst into one.
+        """Blends src and dst into one.
 
         src: img shape of (4, c, w) containing mask in last channel/band
         dst: img shape of (3, c, w)
         """
 
-        print(src.shape, dst.shape)
         assert dst.shape[0] == 3 and src.shape[0] == 4  # c
         assert dst.shape[1:] == src.shape[1:]  # wh
 
         if self.alpha < np.finfo(float).eps:
-            print("Here")
             return dst  # Only dst
         else:
             rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)

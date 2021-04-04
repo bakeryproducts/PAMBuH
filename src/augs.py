@@ -54,10 +54,10 @@ class Augmentator:
     def scale(self): return albu.ShiftScaleRotate(0.0625, 0.1, 15, p=.2)
     def rotate(self): return albu.Rotate(45)
     def cutout(self): return albu.OneOf([
-            albu.Cutout(8, 32, 32, 230,p=.2),
-            albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.2),
-            albu.CoarseDropout(16, 32, 32, 8, 8, 8, 220, p=.6)
-        ],p=.2)
+            albu.Cutout(8, 32, 32, 0,p=.3),
+            albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.3),
+            albu.CoarseDropout(16, 32, 32, 8, 8, 8, 220, p=.4)
+        ],p=.3)
     
     
     def d4(self): return self.compose([
@@ -74,7 +74,7 @@ class Augmentator:
                     #albu.HueSaturationValue(10,15,10),
                     albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.2, contrast=0.1, saturation=0.1, hue=0.1)
+                    albu.ColorJitter(brightness=.3, contrast=0.1, saturation=0.1, hue=0.1)
                     ], p=0.3)
 
     def aug_ssl(self): return self.compose([

@@ -7,6 +7,8 @@ import albumentations.pytorch as albu_pt
 from albumentations.core.transforms_interface import ImageOnlyTransform
 import torch  # to tensor transform
 import numpy as np
+from pathlib import Path
+from PIL import Image
 
 
 class ToTensor(albu_pt.ToTensorV2):
@@ -111,32 +113,53 @@ class Augmentator:
 
     def share_some_light(self): return self.Lightniner()
 
+
 class _AddOverlayBase(ImageOnlyTransform):
     def __init__(self, get_overlay_fn, alpha=1, p=.5):
         super(_AddOverlayBase, self).__init__(p=p)
         self.alpha = alpha
-        self.overlay_fn = overlay_fn
+        self.beta = 1 - alpha
+        self.gamma = 0.0
+        assert 0 <= self.alpha <= 1, f"Invalid alpha value equal to {self.alpha} (from 0.0 to 1.0)"
+        self.get_overlay_fn = get_overlay_fn
 
     def alpha_blend(self, src, dst):
-        # 3hw + 4hw = 3hw
-        # assert shape check
-        # if isinstance(self.alpha, int):
-        # return do cut and paste, mask pixels into crop
-        #  |
-        # \/ this is wrong, cv2.blendalpha or smth
-        #rgb = rgb * (mask // 255)
-        #return img + (alpha * rgb).astype(np.uint8)
-        raise NotImplementedError
-    
-    def apply(self, img, **params): 
+        """Blends src and dst into one.
+
+        src: img shape of (4, c, w) containing mask in last channel/band
+        dst: img shape of (3, c, w)
+        """
+
+        assert dst.shape[0] == 3 and src.shape[0] == 4  # c
+        assert dst.shape[1:] == src.shape[1:]  # wh
+
+        if self.alpha < np.finfo(float).eps:
+            return dst  # Only dst
+        else:
+            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)
+            rgb_cut_by_mask = np.multiply(rgb, mask).astype(np.uint8)
+            if 1 - self.alpha < np.finfo(float).eps:
+                return rgb_cut_by_mask  # Only mask in rgb
+            else:
+                return cv2.addWeighted(rgb_cut_by_mask,
+                                       self.alpha,
+                                       dst,
+                                       self.beta,
+                                       self.gamma)
+
+    def apply(self, img, **params):
         return self.alpha_blend(self.get_overlay_fn(), img)
+
 
 class AddLightning(_AddOverlayBase):
     def __init__(self, imgs_path, alpha=1, p=.5):
-        super(_AddOverlayBase, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
+        super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
         self.imgs = list(Path(imgs_path).glob('*.png'))
 
-    def get_lightning(self): return cv2.imread(str(random.choice(self.imgs))) # OR PIL , careful with BGRRGB BS
+    def get_lightning(self):
+        img = Image.open(str(random.choice(self.imgs)))
+        return np.array(img).transpose([2, 0, 1])  # 4, h, w
+
 
 class AddNoisyPattern(_AddOverlayBase):
     pass

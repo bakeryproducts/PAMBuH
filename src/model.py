@@ -9,6 +9,7 @@ from torch import optim
 from torch.nn import init
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel
+from torch.distributed.optim import ZeroRedundancyOptimizer
 import segmentation_models_pytorch as smp
 
 from add_model import *
@@ -51,12 +52,19 @@ def model_select():
 # 'timm-regnety_040', 'timm-regnety_064', 'timm-regnety_080', 'timm-regnety_120', 'timm-regnety_160', 'timm-regnety_320',
 # 'timm-skresnet18', 'timm-skresnet34', 'timm-skresnext50_32x4d']
 
-    model = smp.manet.MAnet
+    #model = smp.manet.MAnet
     #model = partial(smp.manet.MAnet, encoder_name='timm-efficientnet-b4')
     #model = partial(smp.manet.MAnet, encoder_name='resnext50_32x4d')
     #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_032')
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
     #model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
+
+    #model = partial(smp.Unet, encoder_name='se_resnet50')
+    #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnetx_032')
+    model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_008')
+    #model = smp.Unet
+
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
 
@@ -65,24 +73,27 @@ def model_select():
     return model
 
 def build_model(cfg):
-    base_lr = 1e-4# should be overriden in LR scheduler anyway
-    lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
-    
     model = model_select()()
     if cfg.TRAIN.INIT_MODEL: 
         logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
-    else:
-        pass
-        #init_model(model)
-        #nn.init.constant_(model.segmentation_head[0].bias, -4.59) # manet
-
+    else: pass
     model = model.cuda()
+    model.train()
+    return model 
+
+def get_optim(cfg, model):
+    base_lr = 1e-4# should be overriden in LR scheduler anyway
+    lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
+    
+    #if cfg.PARALLEL.DDP:   
+    #    optimizer = ZeroRedundancyOptimizer(tencent_trick(model), optim=optim.AdamW, lr=lr)
+    #else:
     opt = optim.AdamW
     opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
-    model.train()
-    return model, optimizer
+
+    return optimizer
 
 def wrap_ddp(cfg, model):
     if cfg.PARALLEL.DDP: 

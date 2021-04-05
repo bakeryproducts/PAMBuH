@@ -49,12 +49,12 @@ _____________
 
 5. COde based:
     - Docker
-    - Downscale x5
     - scale problem , .65/.5
     - multiply hard even more
-    - loss scale
-    - unet + seresnet101
-    - init from model
+    - Smooth pseudo label
+    - rate x2
+    - FFPE SPLITS
+
     - optimizerS schedule
     - checkout domainhead
     - 

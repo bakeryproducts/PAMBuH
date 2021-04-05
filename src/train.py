@@ -14,7 +14,7 @@ import utils
 import shallow as sh
 from logger import logger
 from config import cfg, cfg_init
-from model import build_model, wrap_ddp
+from model import build_model, wrap_ddp, get_optim
 from callbacks import *
 
 
@@ -49,9 +49,10 @@ def start_fold(cfg, output_folder, datasets):
     n_epochs = cfg.TRAIN.EPOCH_COUNT
     selective = False
     dls = data.build_dataloaders(cfg, datasets, selective=selective)
-    model, opt = build_model(cfg)
+    model = build_model(cfg)
     model_ema = ema.ModelEmaV2(model, decay=cfg.TRAIN.EMA)
     model = wrap_ddp(cfg, model)
+    opt = get_optim(cfg, model)
 
     #criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = loss.focal_loss
@@ -80,7 +81,7 @@ def start_fold(cfg, output_folder, datasets):
         tb_predict_cb = partial(TBPredictionsCB, writer=writer, logger=logger, step=step)
 
         tb_cbs = [tb_metric_cb(), tb_predict_cb()]
-        #checkpoint_cb = sh.callbacks.CheckpointCB(models_dir, save_step=cfg.TRAIN.SAVE_STEP)
+
         checkpoint_cb = CheckpointCB(models_dir, ema=cfg.TRAIN.EMA, save_step=cfg.TRAIN.SAVE_STEP)
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
@@ -89,11 +90,17 @@ def start_fold(cfg, output_folder, datasets):
     #scale = 1/2 
     l0,l1,l2, scale = cfg.TRAIN.LRS
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
+    l3, l4 = l0, l1
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.15, sh.schedulers.sched_cos(l0,l1)],
-        [.85, sh.schedulers.sched_cos(l1,l2)]])
+        [.1, sh.schedulers.sched_cos(l0,l1)],
+        [.1, sh.schedulers.sched_cos(l1,l3)],
+        [.1, sh.schedulers.sched_cos(l3,l4)],
+        [.7, sh.schedulers.sched_cos(l4,l2)],
+        ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
+
+    #early_stop = EarlyStop(5, logger=logger) TODO DDP
     cbs = [CudaCB(), train_cb, val_cb, lrcb]
         
     if cfg.PARALLEL.IS_MASTER:

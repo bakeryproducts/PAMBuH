@@ -89,7 +89,7 @@ def dump_to_csv(results, dst_path, threshold):
     df = pd.read_csv('input/hm/sample_submission.csv', index_col='id')
     for k, v in results.items():
         df.loc[k.stem] = v
-    df.to_csv(dst_path + f'submission__{int(threshold)}.csv')
+    df.to_csv(str(dst_path / f'submission__{int(threshold)}.csv'))
 
 
 def mask_q_writer(q, H, W, batch_size, total_blocks, root, pad, use_tta, result):
@@ -178,9 +178,10 @@ def start(img_name, gpus, model_folder, threshold, results,
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
     dst = Path('output/predicts')
-    block_size = 2048
+    scale = 3
+    block_size = 512 * scale
     batch_size = 8
-    pad = 1024
+    pad = 256 * scale
     num_processes = 4
     qsize = 24
 
@@ -197,10 +198,12 @@ def start(img_name, gpus, model_folder, threshold, results,
     mask[mask<threshold] = 0
 
     if save_predicts:
-        out_name = dst/'masks'/img_name.name
+        out_name = model_folder/'predicts/masks'/img_name.name
+        os.makedirs(str(out_name.parent), exist_ok=True)
         utils.save_tiff_uint8_single_band(mask, str(out_name))
         if join_predicts:
-            merge_name = dst/'merged'/img_name.name
+            merge_name = model_folder/'predicts/merged'/img_name.name
+            os.makedirs(str(merge_name.parent), exist_ok=True)
             utils.tiff_merge_mask(img_name, str(out_name), merge_name)
 
     logger.log('DEBUG', f'{img_name} done')

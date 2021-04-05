@@ -56,9 +56,9 @@ if __name__ == '__main__':
 
     """
     #model_folder = 'output/925/'
-    model_folder = 'output/2021_Apr_02_18_16_30_PAMBUH/'
-    gpu_list = [0,2]
-    threshold = int(.62 * 255)
+    model_folder = Path('output/2021_Apr_05_00_40_13_PAMBUH/')
+    gpu_list = [0,1,2,3]
+    threshold = int(.4 * 255)
     num_processes = len(gpu_list)
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))

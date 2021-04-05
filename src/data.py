@@ -247,10 +247,12 @@ def init_datasets(cfg):
         "train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/'),
         "val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/'),
 
-        "random_0e": SegmentDataset(DATA_DIR/'backs/random_020_splits/0e/train/'),
-        "random_2a": SegmentDataset(DATA_DIR/'backs/random_020_splits/2a/train/'),
-        "random_18": SegmentDataset(DATA_DIR/'backs/random_020_splits/18/train/'),
-        "random_cc": SegmentDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
+        "random_0e": AuxDataset(DATA_DIR/'backs/random_020_splits/0e/train/'),
+        "random_2a": AuxDataset(DATA_DIR/'backs/random_020_splits/2a/train/'),
+        "random_18": AuxDataset(DATA_DIR/'backs/random_020_splits/18/train/'),
+        "random_cc": AuxDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
+
+
 
         "random_0e_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/0e/train/'),
         "random_2a_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/2a/train/'),
@@ -264,15 +266,39 @@ def init_datasets(cfg):
 
 
         "backs_cort": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex/'),
-        "backs_cort_0e": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/'),
-        "backs_cort_2a": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/'),
-        "backs_cort_18": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
-        "backs_cort_cc": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
+        "backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/'),
+        "backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/'),
+        "backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
+        "backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
 
         "backs_cort_0e_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/0e/train/'),
         "backs_cort_2a_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/2a/train/'),
         "backs_cort_18_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/18/train/'),
         "backs_cort_cc_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/cc/train/'),
+
+# _______________________________________________________ 33________________
+
+        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
+        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/val/'),
+
+        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
+        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/val/'),
+
+        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
+        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/18/val/'),
+
+        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
+        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
+
+        "random_0e_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
+        "random_2a_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),
+        "random_18_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/18/train/'),
+        "random_cc_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/train/'),
+
+        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/val/'),
+        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/val/'),
+        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/18/val/'),
+        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/val/'),
 
     }
     return  DATASETS
@@ -377,7 +403,7 @@ def build_dataloaders(cfg, datasets, selective=False):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = mode == 'TRAIN'
+    drop_last = False
     sampler = None 
 
 
@@ -386,8 +412,9 @@ def build_dataloader(cfg, dataset, mode, selective):
             sampler = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
 
     num_workers = cfg.TRAIN.NUM_WORKERS 
-    if mode == 'TRAIN': shuffle = sampler is None
-    else: shuffle = False
+    #if mode == 'TRAIN': shuffle = sampler is None
+    #else: shuffle = False
+    shuffle = sampler is None
 
     dl = DataLoader(
         dataset,

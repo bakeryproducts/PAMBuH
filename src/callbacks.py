@@ -115,6 +115,26 @@ class TBMetricCB(TrackResultsCB):
         else: self.after_epoch_valid()
         self.writer.flush()
 
+class EarlyStop(sh.callbacks.Callback):
+    def __init__(self, num=5, logger=None):
+        sh.utils.store_attr(self, locals())
+        self.best = 0
+        self.cnt = 0
+
+    @sh.utils.on_validation
+    def after_epoch(self):
+        cb = get_cb_by_instance(self.cbs, TBMetricCB)
+        if cb is None: return 
+        best = cb.max_dice
+        if best > self.best:
+            self.best = best
+            self.cnt = 0
+        else:
+            self.cnt += 1
+            if self.cnt >= self.num:
+                self.log_debug(f'EARLY STOP, {self.best}')
+                torch.distributed.destroy_process_group() # ugly way , should use allreduce
+                raise sh.learner.CancelFitException 
         
 class TBPredictionsCB(sh.callbacks.Callback):
     def __init__(self, writer, logger=None, step=1):
@@ -225,7 +245,7 @@ class TrainCB(sh.callbacks.Callback):
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
     
-    def mask_out_border(self, loss, d=32):
+    def mask_out_border(self, loss, d):
         mask = torch.zeros_like(loss)
         mask[:,:,:d , :  ] = 1
         mask[:,:,:  , :d ] = 1
@@ -239,8 +259,8 @@ class TrainCB(sh.callbacks.Callback):
         self.learner.preds = self.model(xb)
         loss = self.loss_func(self.preds, yb, reduction='none')
 
-        border_mask = self.mask_out_border(loss, 32)
-        loss[(border_mask * yb)>0] = 0
+        #border_mask = self.mask_out_border(loss, 16)
+        #loss[(border_mask * yb)>0] = 0
 
         if border is not None:
             #print(border.shape, border.sum(), border.max(), yb.sum(), yb.max())

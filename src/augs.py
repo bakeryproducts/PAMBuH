@@ -117,7 +117,7 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
     def __init__(self, get_overlay_fn, alpha=1, p=.5, d4_prob=.5):
         """
         p: probability to apply blending transform
-        default_prob: probability to apply d4 transform in blending
+        d4_prob: probability to apply d4 transform
         """
         super(_AddOverlayBase, self).__init__(p=p)
         self.alpha = alpha

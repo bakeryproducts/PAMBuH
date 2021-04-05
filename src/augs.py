@@ -114,32 +114,43 @@ class Augmentator:
 
 
 class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
-    def __init__(self, get_overlay_fn, alpha=1, p=.5):
+    def __init__(self, get_overlay_fn, alpha=1, p=.5, d4_prob=.5):
+        """
+        p: probability to apply blending transform
+        default_prob: probability to apply d4 transform in blending
+        """
         super(_AddOverlayBase, self).__init__(p=p)
         self.alpha = alpha
         self.beta = 1 - alpha
         self.gamma = 0.0
         assert 0 <= self.alpha <= 1, f"Invalid alpha value equal to {self.alpha} (from 0.0 to 1.0)"
         self.get_overlay_fn = get_overlay_fn
-        self._default_prob = .75 # ? why
+        self._d4_prob = d4_prob
 
-    def flip(self, dst, p=self._default_prob):
+    def flip(self, dst, p=None):
+        if p is None: p = self._d4_prob
+
         if random.random() < p:
             axes = [1, 2, (1, 2)]  # Includes h or w
             dst = np.flip(dst, random.choice(axes))
         return dst
 
-    def rotate90(self, dst, p=self._default_prob):
+    def rotate90(self, dst, p=None):
+        if p is None: p = self._d4_prob
+
         if random.random() < p:
             num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
             axes = (1, 2)  # Includes hw
             dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
         return dst
 
-    def d4(self, dst, p=self._default_prob): return self.rotate90(self.flip(dst, p=p), p=p)
+    def d4(self, dst, p=None):
+        if p is None: p = self._d4_prob
+        flip_prob = rotate_prob = 1 - np.sqrt(1 - p)
+        return self.rotate90(self.flip(dst, p=flip_prob), p=rotate_prob)
 
     def alpha_blend(self, src, dst):
-        """ 
+        """
         src: MASK, (4, h, w) containing mask in last channel/band
         dst: IMAGE, (3, h, w)
         """
@@ -147,13 +158,8 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
         assert dst.shape[0] == 3 and src.shape[0] == 4  # c
         assert dst.shape[1:] == src.shape[1:]  # hw
 
-        if self.alpha < np.finfo(float).eps: raise Exception
-        elif self.alpha == 1.0: # > 1 -np.finfo(float).eps ?
-            src = self.d4(src)
-            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
-            # easy mode TODO: check if it works
-            dst[mask] = rgb[mask]
-            return dst
+        if np.allclose(self.alpha, 0.0):
+            raise Exception
         else:
             src = self.d4(src)
             rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
@@ -161,12 +167,14 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
             blended_cut_by_mask = np.multiply(blended, mask).astype(np.uint8)
             return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)  # 3hw
 
-    def apply(self, img, **params): return self.alpha_blend(self.get_overlay_fn(), img)
+    def apply(self, img, **params):
+        return self.alpha_blend(self.get_overlay_fn(), img)
 
 
 class AddLightning(_AddOverlayBase):
-    def __init__(self, imgs_path, alpha=1, p=.5):
-        super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
+    def __init__(self, imgs_path, alpha=1, p=.5, d4_prob=.5):
+        super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p,
+                                           d4_prob=d4_prob)
         self.imgs = list(Path(imgs_path).glob('*.png'))
 
     def get_lightning(self):

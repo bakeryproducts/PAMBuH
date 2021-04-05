@@ -1,21 +1,19 @@
 import random
+from pathlib import Path
 from functools import partial
 
 import cv2
-import albumentations as albu
-import albumentations.pytorch as albu_pt
-from albumentations.core.transforms_interface import ImageOnlyTransform
 import torch  # to tensor transform
 import numpy as np
-from pathlib import Path
 from PIL import Image
-import random
+import albumentations as albu
+import albumentations.pytorch as albu_pt
+#from albumentations.core.transforms_interface import ImageOnlyTransform
 
 
 class ToTensor(albu_pt.ToTensorV2):
     def apply_to_mask(self, mask, **params): return torch.from_numpy(mask).permute((2,0,1))
     def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
-
 
 
 class Augmentator:
@@ -115,7 +113,7 @@ class Augmentator:
     def share_some_light(self): return self.Lightniner()
 
 
-class _AddOverlayBase(ImageOnlyTransform):
+class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
     def __init__(self, get_overlay_fn, alpha=1, p=.5):
         super(_AddOverlayBase, self).__init__(p=p)
         self.alpha = alpha
@@ -123,19 +121,39 @@ class _AddOverlayBase(ImageOnlyTransform):
         self.gamma = 0.0
         assert 0 <= self.alpha <= 1, f"Invalid alpha value equal to {self.alpha} (from 0.0 to 1.0)"
         self.get_overlay_fn = get_overlay_fn
+        self._default_prob = .75 # ? why
+
+    def flip(self, dst, p=self._default_prob):
+        if random.random() < p:
+            axes = [1, 2, (1, 2)]  # Includes h or w
+            dst = np.flip(dst, random.choice(axes))
+        return dst
+
+    def rotate90(self, dst, p=self._default_prob):
+        if random.random() < p:
+            num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
+            axes = (1, 2)  # Includes hw
+            dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
+        return dst
+
+    def d4(self, dst, p=self._default_prob): return self.rotate90(self.flip(dst, p=p), p=p)
 
     def alpha_blend(self, src, dst):
-        """ Blends src and dst into one.
-
-        src: img shape of (4, h, w) containing mask in last channel/band
-        dst: img shape of (3, h, w)
+        """ 
+        src: MASK, (4, h, w) containing mask in last channel/band
+        dst: IMAGE, (3, h, w)
         """
 
         assert dst.shape[0] == 3 and src.shape[0] == 4  # c
         assert dst.shape[1:] == src.shape[1:]  # hw
 
-        if self.alpha < np.finfo(float).eps:
-            return dst  # Only dst
+        if self.alpha < np.finfo(float).eps: raise Exception
+        elif self.alpha == 1.0: # > 1 -np.finfo(float).eps ?
+            src = self.d4(src)
+            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
+            # easy mode TODO: check if it works
+            dst[mask] = rgb[mask]
+            return dst
         else:
             src = self.d4(src)
             rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
@@ -143,31 +161,7 @@ class _AddOverlayBase(ImageOnlyTransform):
             blended_cut_by_mask = np.multiply(blended, mask).astype(np.uint8)
             return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)  # 3hw
 
-    def apply(self, img, **params):
-        return self.alpha_blend(self.get_overlay_fn(), img)
-
-    def flip(self, dst, p=0.75):
-        """
-        dst: img with shape of either chw or cwh
-        p: probability to apply transform
-        """
-        if random.random() < p:
-            axes = [1, 2, (1, 2)]  # Includes h or w
-            dst = np.flip(dst, random.choice(axes))
-        return dst
-
-    def rotate90(self, dst, p=0.75):
-        """
-        dst: img with shape of either chw or cwh
-        p: probability to apply transform
-        """
-        if random.random() < p:
-            num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
-            axes = (1, 2)  # Includes hw
-            dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
-        return dst
-
-    def d4(self, dst, p=0.75): return self.rotate90(self.flip(dst, p=p), p=p)
+    def apply(self, img, **params): return self.alpha_blend(self.get_overlay_fn(), img)
 
 
 class AddLightning(_AddOverlayBase):
@@ -178,7 +172,6 @@ class AddLightning(_AddOverlayBase):
     def get_lightning(self):
         img = Image.open(str(random.choice(self.imgs)))
         return np.array(img).transpose([2, 0, 1])  # 4, h, w
-
 
 class AddNoisyPattern(_AddOverlayBase):
     pass

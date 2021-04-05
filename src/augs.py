@@ -127,17 +127,13 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
         self.get_overlay_fn = get_overlay_fn
         self._d4_prob = d4_prob
 
-    def flip(self, dst, p=None):
-        if p is None: p = self._d4_prob
-
+    def flip(self, dst, p):
         if random.random() < p:
             axes = [1, 2, (1, 2)]  # Includes h or w
             dst = np.flip(dst, random.choice(axes))
         return dst
 
-    def rotate90(self, dst, p=None):
-        if p is None: p = self._d4_prob
-
+    def rotate90(self, dst, p):
         if random.random() < p:
             num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
             axes = (1, 2)  # Includes hw

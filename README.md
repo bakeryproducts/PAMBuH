@@ -54,6 +54,12 @@ _____________
     - Smooth pseudo label
     - rate x2
     - FFPE SPLITS
+    - threshold ?
+    - pseudo on test
+    - highres finetune?
+    - augs
+    - clean images research
+    - tricky image research
 
     - optimizerS schedule
     - checkout domainhead

@@ -72,7 +72,7 @@ class Augmentator:
                     #albu.HueSaturationValue(10,15,10),
                     albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.3, contrast=0.3, saturation=0.3, hue=0.3)
+                    albu.ColorJitter(brightness=.3, contrast=0.3, saturation=0.2, hue=0.2)
                     ], p=0.3)
 
     def aug_ssl(self): return self.compose([
@@ -113,7 +113,7 @@ class Augmentator:
 
 
 class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
-    def __init__(self, get_overlay_fn, alpha=1, p=.5, d4_prob=.5):
+    def __init__(self, get_overlay_fn, alpha=1, p=.5):
         """
         p: probability to apply blending transform
         d4_prob: probability to apply d4 transform
@@ -124,57 +124,66 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
         self.gamma = 0.0
         assert 0 <= self.alpha <= 1, f"Invalid alpha value equal to {self.alpha} (from 0.0 to 1.0)"
         self.get_overlay_fn = get_overlay_fn
-        self._d4_prob = d4_prob
 
     def flip(self, dst, p=.5):
         if random.random() < p:
-            axes = [1, 2, (1, 2)]  # Includes h or w
+            #axes = [1, 2, (1, 2)]  # Includes h or w
+            axes = [0, 1, (0, 1)]  # Includes h or w
             dst = np.flip(dst, random.choice(axes))
         return dst
 
     def rotate90(self, dst, p=.5):
         if random.random() < p:
             num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
-            axes = (1, 2)  # Includes hw
+            axes = (0, 1)  # Includes hw
             dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
         return dst
 
-    def d4(self, dst, p=None):
-        if p is None: p = self._d4_prob
-        flip_prob = rotate_prob = 1 - np.sqrt(1 - p)
-        return self.rotate90(self.flip(dst, p=flip_prob), p=rotate_prob)
+    def d4(self, img, p=.5):
+        if random.random() < p:
+            tr = albu.Compose([albu.Flip(), albu.RandomRotate90()])
+            return tr(image=img)['image']
 
-    def alpha_blend(self, src, dst):
-        """
-        src: MASK, (4, h, w) containing mask in last channel/band
-        dst: IMAGE, (3, h, w)
-        """
+        return img
 
-        assert dst.shape[0] == 3 and src.shape[0] == 4  # c
-        assert dst.shape[1:] == src.shape[1:]  # hw
+    def _d4(self, image, p=.5):
+        if random.random() < p:
+            flip_prob , rotate_prob = .5 , .5
+            return self.rotate90(self.flip(image, p=flip_prob), p=rotate_prob)
+        return image
+
+    def alpha_blend(self, image, mask):
+        """
+        IMAGE, (h, w, 3)
+        MASK,  (h, w, 4) containing mask in last channel/band
+        """
+    
+        assert image.shape[2] == 3 and mask.shape[2] == 4, (image.shape, mask.shape)  # c
+        assert image.shape[:2] == mask.shape[:2]  , (image.shape, mask.shape)  # hw
 
         if np.allclose(self.alpha, 0.0):
             raise Exception
         else:
-            src = self.d4(src)
-            rgb, mask = src[:3], np.where(src[3] > 0, True, False).astype(int)  # 3hw, hw
-            blended = cv2.addWeighted(rgb, self.alpha, dst, self.beta, self.gamma)
-            blended_cut_by_mask = np.multiply(blended, mask).astype(np.uint8)
-            return np.where(blended_cut_by_mask > 0, blended_cut_by_mask, dst)  # 3hw
+            mask = self.d4(mask, p=1)
+            rgb, bool_mask = mask[...,:3], mask[...,3] > 0
+            blended = cv2.addWeighted(rgb, self.alpha, image, self.beta, self.gamma)
+            image[bool_mask] = blended[bool_mask]
+            return image
 
     def apply(self, img, **params):
-        return self.alpha_blend(self.get_overlay_fn(), img)
+        return self.alpha_blend(img, self.get_overlay_fn())
 
 
 class AddLightning(_AddOverlayBase):
-    def __init__(self, imgs_path, alpha=1, p=.5, d4_prob=.5):
-        super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p,
-                                           d4_prob=d4_prob)
-        self.imgs = list(Path(imgs_path).glob('*.png'))
+    def __init__(self, imgs_path, alpha=1, p=.5):
+        super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
+        self.imgs = list(Path(imgs_path).rglob('*.png'))
+
+    def _expander(self, img): return np.array(img)
 
     def get_lightning(self):
         img = Image.open(str(random.choice(self.imgs)))
-        return np.array(img).transpose([2, 0, 1])  # 4, h, w
+        return self._expander(img)
 
 class AddNoisyPattern(_AddOverlayBase):
     pass

@@ -8,7 +8,6 @@ import numpy as np
 from PIL import Image
 import albumentations as albu
 import albumentations.pytorch as albu_pt
-#from albumentations.core.transforms_interface import ImageOnlyTransform
 
 
 class ToTensor(albu_pt.ToTensorV2):
@@ -73,7 +72,7 @@ class Augmentator:
                     #albu.HueSaturationValue(10,15,10),
                     albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.3, contrast=0.1, saturation=0.1, hue=0.1)
+                    albu.ColorJitter(brightness=.3, contrast=0.3, saturation=0.3, hue=0.3)
                     ], p=0.3)
 
     def aug_ssl(self): return self.compose([
@@ -123,20 +122,20 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
         self.get_overlay_fn = get_overlay_fn
         self._default_prob = .75 # ? why
 
-    def flip(self, dst, p=self._default_prob):
+    def flip(self, dst, p=.5):
         if random.random() < p:
             axes = [1, 2, (1, 2)]  # Includes h or w
             dst = np.flip(dst, random.choice(axes))
         return dst
 
-    def rotate90(self, dst, p=self._default_prob):
+    def rotate90(self, dst, p=.5):
         if random.random() < p:
             num_rotates = [1, 2, 3]  # 90, 180 and 270 counterclockwise
             axes = (1, 2)  # Includes hw
             dst = np.rot90(dst, random.choice(num_rotates), axes=axes)
         return dst
 
-    def d4(self, dst, p=self._default_prob): return self.rotate90(self.flip(dst, p=p), p=p)
+    def d4(self, dst, p=1): return self.rotate90(self.flip(dst))
 
     def alpha_blend(self, src, dst):
         """ 

@@ -120,6 +120,8 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
         """
         super(_AddOverlayBase, self).__init__(p=p)
         self.alpha = alpha
+        if np.allclose(self.alpha, 0.0): raise Exception
+
         self.beta = 1 - alpha
         self.gamma = 0.0
         assert 0 <= self.alpha <= 1, f"Invalid alpha value equal to {self.alpha} (from 0.0 to 1.0)"
@@ -152,23 +154,21 @@ class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):
             return self.rotate90(self.flip(image, p=flip_prob), p=rotate_prob)
         return image
 
-    def alpha_blend(self, image, mask):
+    def _blend(self, image1, image2): return cv2.addWeighted(image1, self.alpha, image2, self.beta, self.gamma)
+
+    def alpha_blend(self, image, aug_image):
         """
         IMAGE, (h, w, 3)
-        MASK,  (h, w, 4) containing mask in last channel/band
+        AUG_IMAGE,  (h, w, 4) containing mask in last channel/band
         """
-    
-        assert image.shape[2] == 3 and mask.shape[2] == 4, (image.shape, mask.shape)  # c
-        assert image.shape[:2] == mask.shape[:2]  , (image.shape, mask.shape)  # hw
+        assert image.shape[2] == 3 and aug_image.shape[2] == 4, (image.shape, aug_image.shape)  # c
+        assert image.shape[:2] == aug_image.shape[:2]  , (image.shape, aug_image.shape)  # hw
 
-        if np.allclose(self.alpha, 0.0):
-            raise Exception
-        else:
-            mask = self.d4(mask, p=1)
-            rgb, bool_mask = mask[...,:3], mask[...,3] > 0
-            blended = cv2.addWeighted(rgb, self.alpha, image, self.beta, self.gamma)
-            image[bool_mask] = blended[bool_mask]
-            return image
+        aug_image = self.d4(aug_image, p=1)
+        rgb, mask = aug_image[...,:3], aug_image[...,3] > 0
+        blended = self._blend(rgb, image)
+        image[mask] = blended[mask]
+        return image
 
     def apply(self, img, **params):
         return self.alpha_blend(img, self.get_overlay_fn())

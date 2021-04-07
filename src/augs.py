@@ -194,8 +194,8 @@ class AddNoisyPattern(_AddOverlayBase):
 
     def _expander(self, img): return np.array(img)
 
-    def _aug_with_dark_rgb(self, mask, min_val, max_val):
-        """Returns aug_image shape of (hw4) containing rgb and mask:
+    def _aug_with_noisy_rgb(self, mask, min_val, max_val):
+        """Returns aug_image shape of (h, w, 4) containing rgb and mask:
             - rgb pixel values are integers randomly drawn
               from {self.min_px_val} (included) to {self.max_px_val} (excluded)
             - mask pixel values are either 0 or 255
@@ -210,7 +210,7 @@ class AddNoisyPattern(_AddOverlayBase):
     def get_dark_glom(self):
         mask = Image.open(str(random.choice(self.masks)))  # hw1
         mask = self._expander(mask)
-        return self._aug_with_dark_rgb(mask, self.min_px_val, self.max_px_val)  # hw4
+        return self._aug_with_noisy_rgb(mask, self.min_px_val, self.max_px_val)  # hw4
 
 
 def get_aug(aug_type, transforms_cfg, border=False):

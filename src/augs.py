@@ -186,15 +186,15 @@ class AddLightning(_AddOverlayBase):
         return self._expander(img)
 
 
-class AddNoisyPattern(_AddOverlayBase):
+class AddGlom(_AddOverlayBase):
     def __init__(self, masks_path, alpha=1, p=.5, min_px_val=100, max_px_val=200):
-        super(AddNoisyPattern, self).__init__(get_overlay_fn=self.get_dark_glom, alpha=alpha, p=p)
+        super(AddGlom, self).__init__(get_overlay_fn=self.get_glom, alpha=alpha, p=p)
         self.masks = list(Path(masks_path).rglob('*.png'))
         self.min_px_val, self.max_px_val = min_px_val, max_px_val
 
     def _expander(self, img): return np.array(img)
 
-    def _aug_with_noisy_rgb(self, mask, min_val, max_val):
+    def _aug_with_rand_rgb(self, mask, min_px_val, max_px_val):
         """Returns aug_image shape of (h, w, 4) containing rgb and mask:
             - rgb pixel values are integers randomly drawn
               from {self.min_px_val} (included) to {self.max_px_val} (excluded)
@@ -203,14 +203,14 @@ class AddNoisyPattern(_AddOverlayBase):
         h, w, c = mask.shape  # hw1
         assert c == 1, "Invalid number of channels"
         assert np.max(mask) <= 1, "Mask should contain either 0 or 1"
-        rgb = np.random.randint(min_val, max_val, size=(h, w, 3), dtype=np.uint8)  # hw3
+        rgb = np.random.randint(min_px_val, max_px_val, size=(h, w, 3), dtype=np.uint8)  # hw3
         aug_image = np.concatenate((rgb, mask), axis=2)
         return aug_image  # hw4
 
-    def get_dark_glom(self):
+    def get_glom(self):
         mask = Image.open(str(random.choice(self.masks)))  # hw1
         mask = self._expander(mask)
-        return self._aug_with_noisy_rgb(mask, self.min_px_val, self.max_px_val)  # hw4
+        return self._aug_with_rand_rgb(mask, self.min_px_val, self.max_px_val)  # hw4
 
 
 def get_aug(aug_type, transforms_cfg, border=False):

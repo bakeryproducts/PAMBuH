@@ -187,8 +187,36 @@ class AddLightning(_AddOverlayBase):
         img = Image.open(str(random.choice(self.imgs)))
         return self._expander(img)
 
-class AddNoisyPattern(_AddOverlayBase):
-    pass
+
+class AddGlom(_AddOverlayBase):
+    def __init__(self, masks_path, alpha=1, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
+        """Default base_r, base_r, base_b and shift are chosen from hist."""
+        super(AddGlom, self).__init__(get_overlay_fn=self.get_glom, alpha=alpha, p=p)
+        self.masks = list(Path(masks_path).rglob('*.png'))
+        self.base_r, self.base_g, self.base_b = base_r, base_g, base_b
+        self.shift = shift
+
+    def _expander(self, img): return np.array(img)
+
+    def _aug_with_rand_rgb(self, mask):
+        """Returns aug_image shape of (h, w, 4) containing rgb and mask:
+            - rgb pixel values are integers randomly drawn colour
+            - mask pixel values are either 0 or 255
+        """
+        h, w, c = mask.shape  # hw1
+        assert c == 1, "Invalid number of channels"
+        assert np.max(mask) <= 1, "Mask should contain either 0 or 1"
+
+        shift_r, shift_g, shift_b = np.random.randint(-self.shift, self.shift, size=3)
+        r = np.full((h, w, 1), self.base_r + shift_r, dtype=np.uint8)  # hw1
+        g = np.full((h, w, 1), self.base_g + shift_g, dtype=np.uint8)  # hw1
+        b = np.full((h, w, 1), self.base_b + shift_b, dtype=np.uint8)  # hw1
+        return np.concatenate((r, g, b, mask), axis=2)  # hw4
+
+    def get_glom(self):
+        mask = Image.open(str(random.choice(self.masks)))  # hw1
+        mask = self._expander(mask)
+        return self._aug_with_rand_rgb(mask)  # hw4
 
 
 def get_aug(aug_type, transforms_cfg, border=False):

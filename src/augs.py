@@ -25,7 +25,7 @@ class Augmentator:
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
-        #self.Lightniner = partial(AddLightning, self.cfg.DATA.AUG.LIGHT_PATH, alpha=1)
+        self.Alights = partial(AddLightning, imgs_path='input/aug_data/light/') # cfg is partial! there is no cfg.INPUTS here
 
 
     def get_aug(self, kind):
@@ -97,6 +97,7 @@ class Augmentator:
 
     def additional_res(self):
         return self.compose([
+                    self.Alights(p=.3),
                     self.color_jit(),
                     self.cutout(),
                     self.blur(),
@@ -178,6 +179,7 @@ class AddLightning(_AddOverlayBase):
     def __init__(self, imgs_path, alpha=1, p=.5):
         super(AddLightning, self).__init__(get_overlay_fn=self.get_lightning, alpha=alpha, p=p)
         self.imgs = list(Path(imgs_path).rglob('*.png'))
+        assert len(self.imgs) > 0, imgs_path
 
     def _expander(self, img): return np.array(img)
 

@@ -22,23 +22,6 @@ from sampler import GdalSampler
 from nn_sampler import SelectiveSampler, DistributedSamplerWrapper
 
 
-class WeightedDataset:
-    def __init__(self, dataset, scores, replacement=True):
-        assert len(dataset) == len(scores), (len(dataset), len(scores))
-        scores = (1 + scores) ** (2)
-        self.scores = scores / scores.sum()
-        self.dataset = dataset
-        self.replacement = replacement
-        self.idxs = list(range(len(self.dataset)))
-        #self.sampler = WeightedRandomSampler(self.scores, len(self.scores), replacement=replacement)
-    
-    def __getitem__(self, _):
-        num_samples = 1
-        idx = np.random.choice(self.idxs, num_samples, self.replacement, self.scores)
-        #idxs = list(self.sampler)
-        return self.dataset[idx[0]]
-        
-    def __len__(self): return len(self.dataset)
 
 class TransformSSLDataset:
     def __init__(self, dataset, transforms):
@@ -54,6 +37,11 @@ class TransformSSLDataset:
     
     def __len__(self): return len(self.dataset)
     
+class TagDataset:
+    def __init__(self, ds, tag): self.ds, self.tag = ds, tag
+    def __getitem__(self, idx): return (*self.ds[idx], self.tag)
+    def __len__(self): return len(self.ds)
+
 class SSLDataset:
     def __init__(self, root, crop_size):
         self.dataset = ImageDataset(root, '*/*.png')
@@ -73,81 +61,6 @@ class SSLDataset:
 
     def __len__(self): return len(self.dataset)
 
-class BorderSegmentDataset:
-    '''
-    mode_train False  is for viewing imgs in ipunb
-    imgs_path - path to folder with cutted samples: 'input/train/cuts512/'
-    -train
-        -cuts512
-            -imgs
-                -afe419239
-                    0.png
-                    1.png
-            -masks
-                -afe419239
-                    0.png
-                    1.png
-            -borders
-                -afe419239
-                    0.png
-                    1.png
-    '''
-    def __init__(self, root, mode_train=True, hard_mult=None, weights=None):
-        imgs_path, masks_path, borders_path = root / 'imgs', root / 'masks', root / 'borders'
-
-        self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
-        self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
-        self.borders_folders = utils.get_filenames(borders_path, '*', lambda x: False)
-        self.mode_train = mode_train
-        self.img_domains = {  
-                         '4ef6695ce': 1,
-                         'b9a3865fc': 0,
-                         'e79de561c': 1,
-                         '8242609fa': 0,
-                         'cb2d976f4': 0,
-                         '26dc41664': 1,
-                         'b2dc8411c': 0,
-                         'afa5e8098': 1,
-                         '0486052bb': 0,
-                         '1e2425f28': 1,
-                         'c68fe75ea': 1,
-                         'aaa6a05cc': 0,
-                         '54f2eec69': 1,
-                         '095bf7a1f': 1,
-                         '2f6ecfcdf': 0,
-                         }
-        scores = self._load_scores(weights) if weights else None
-        
-        dss = []
-        for imgf, maskf, bordf in zip(self.img_folders, self.masks_folders, self.borders_folders):
-            ids = ImageDataset(imgf, '*.png')
-            mds = ImageDataset(maskf, '*.png')
-            bds = ImageDataset(bordf, '*.png')
-            if self.mode_train:
-                ids.process_item = expander
-                mds.process_item = expander_float
-                bds.process_item = expander_float
-            dataset = TripleDataset(ids, mds, bds)
-
-            #if weights: dataset = WeightedDataset(dataset, scores[imgf.stem])
-            if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
-            dss.append(dataset)
-        
-        self.dataset = ConcatDataset(dss)
-    
-    def _load_scores(self, path):
-        with open(path, 'rb') as f:
-            scores = pickle.load(f)
-        return scores
-
-    def __len__(self): return len(self.dataset)
-    def __getitem__(self, idx): return self.dataset[idx]
-    def _view(self, idx, border=False):
-        a,b,c = self.__getitem__(idx)
-        if b.mode == 'L': b = b.convert('RGB')
-        if c.mode == 'L': c = c.convert('RGB')
-        if border: return Image.blend(a,c,.5)
-        else: return Image.blend(a,b,.5)
 
 class SegmentDataset:
     '''
@@ -164,26 +77,26 @@ class SegmentDataset:
                     0.png
                     1.png
     '''
-    def __init__(self, root, mode_train=True, hard_mult=None, weights=None):
+    def __init__(self, root, mode_train=True, hard_mult=None, weights=None, frozen=False):
         imgs_path, masks_path = root / 'imgs', root / 'masks'
         self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
         self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
         self.mode_train = mode_train
         self.img_domains = {  
                          '4ef6695ce': 1,
-                         'b9a3865fc': 0,
                          'e79de561c': 1,
-                         '8242609fa': 0,
-                         'cb2d976f4': 0,
                          '26dc41664': 1,
-                         'b2dc8411c': 0,
                          'afa5e8098': 1,
-                         '0486052bb': 0,
                          '1e2425f28': 1,
                          'c68fe75ea': 1,
-                         'aaa6a05cc': 0,
                          '54f2eec69': 1,
                          '095bf7a1f': 1,
+                         'b9a3865fc': 0,
+                         '8242609fa': 0,
+                         'cb2d976f4': 0,
+                         'b2dc8411c': 0,
+                         '0486052bb': 0,
+                         'aaa6a05cc': 0,
                          '2f6ecfcdf': 0,
                          }
         scores = self._load_scores(weights) if weights else None
@@ -197,9 +110,78 @@ class SegmentDataset:
                 mds.process_item = expander_float
             dataset = PairDataset(ids, mds)
 
-            #if weights: dataset = WeightedDataset(dataset, scores[imgf.stem])
             if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
-            dss.append(dataset)
+            if frozen:
+                if not self.img_domains[imgf.name]: dss.append(dataset)
+            else:
+                dss.append(dataset)
+        
+        self.dataset = ConcatDataset(dss)
+    
+    def _load_scores(self, path):
+        with open(path, 'rb') as f:
+            scores = pickle.load(f)
+        return scores
+
+    def __len__(self): return len(self.dataset)
+    def __getitem__(self, idx): return self.dataset[idx]
+    def _view(self, idx):
+        a,b = self.__getitem__(idx)
+        if b.mode == 'L': b = b.convert('RGB')
+        return Image.blend(a,b,.5)
+
+class TagSegmentDataset:
+    '''
+    mode_train False  is for viewing imgs in ipunb
+    imgs_path - path to folder with cutted samples: 'input/train/cuts512/'
+    -train
+        -cuts512
+            -imgs
+                -afe419239
+                    0.png
+                    1.png
+            -masks
+                -afe419239
+                    0.png
+                    1.png
+    '''
+    def __init__(self, root, mode_train=True, hard_mult=None, frozen=False):
+        imgs_path, masks_path = root / 'imgs', root / 'masks'
+        self.img_folders = utils.get_filenames(imgs_path, '*', lambda x: False)
+        self.masks_folders = utils.get_filenames(masks_path, '*', lambda x: False)
+        self.mode_train = mode_train
+        self.img_domains = {  
+                         '4ef6695ce': 1,
+                         'e79de561c': 1,
+                         '26dc41664': 1,
+                         'afa5e8098': 1,
+                         '1e2425f28': 1,
+                         'c68fe75ea': 1,
+                         '54f2eec69': 1,
+                         '095bf7a1f': 1,
+                         'b9a3865fc': 0,
+                         '8242609fa': 0,
+                         'cb2d976f4': 0,
+                         'b2dc8411c': 0,
+                         '0486052bb': 0,
+                         'aaa6a05cc': 0,
+                         '2f6ecfcdf': 0,
+                         }
+        
+        dss = []
+        for imgf, maskf in zip(self.img_folders, self.masks_folders):
+            ids = ImageDataset(imgf, '*.png')
+            mds = ImageDataset(maskf, '*.png')
+            if self.mode_train:
+                ids.process_item = expander
+                mds.process_item = expander_float
+            dataset = PairDataset(ids, mds)
+            dataset = TagDataset(dataset, self.img_domains[imgf.name])
+
+            if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
+            if frozen:
+                if not self.img_domains[imgf.name]: dss.append(dataset)
+            else: dss.append(dataset)
         
         self.dataset = ConcatDataset(dss)
     
@@ -226,8 +208,12 @@ def init_datasets(cfg):
     if not DATA_DIR.exists(): raise Exception(DATA_DIR)
     mult = cfg['TRAIN']['HARD_MULT']
     weights = cfg['TRAIN']['WEIGHTS']
-    AuxDataset = partial(SegmentDataset, hard_mult=mult, weights=weights)
-    BorderAuxDataset = partial(BorderSegmentDataset, hard_mult=mult, weights=weights)
+
+    AuxDataset = partial(SegmentDataset, hard_mult=mult)
+    AuxFrozenDataset = partial(SegmentDataset, hard_mult=mult, frozen=True)
+    #AuxDataset = partial(TagSegmentDataset, hard_mult=mult)
+    #AuxFrozenDataset = partial(TagSegmentDataset, hard_mult=mult, frozen=True)
+
 
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
@@ -235,7 +221,6 @@ def init_datasets(cfg):
         "train1536full": AuxDataset(DATA_DIR/'CUTS/cuts1536x25'),
 
         "train_0e": AuxDataset(DATA_DIR/'SPLITS/f_split/0e/train/'),
-        "train_0e_b": BorderAuxDataset(DATA_DIR/'SPLITS/f_split_b/0e/train/'),
         "val_0e": SegmentDataset(DATA_DIR/'SPLITS/f_split/0e/val/'),
 
         "train_2a": AuxDataset(DATA_DIR/'SPLITS/f_split/2a/train/'),
@@ -253,12 +238,6 @@ def init_datasets(cfg):
         "random_cc": AuxDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
 
 
-
-        "random_0e_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/0e/train/'),
-        "random_2a_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/2a/train/'),
-        "random_18_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/18/train/'),
-        "random_cc_b": BorderSegmentDataset(DATA_DIR/'backs/random_020_splits_b/cc/train/'),
-
         "sclero": SegmentDataset(DATA_DIR/'scleros_glomi/scle_cuts_1024/'), 
 
         "ssl_test": SslDS(DATA_DIR/'ssl_cortex'),
@@ -271,26 +250,32 @@ def init_datasets(cfg):
         "backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
         "backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
 
-        "backs_cort_0e_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/0e/train/'),
-        "backs_cort_2a_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/2a/train/'),
-        "backs_cort_18_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/18/train/'),
-        "backs_cort_cc_b": BorderSegmentDataset(DATA_DIR/'backs/backs_x25_cortex_splits_b/cc/train/'),
 
 # _______________________________________________________ 33________________
 
         "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
+        "train_0e_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
+        "train_0e_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/0e/train/'),
         "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/val/'),
 
         "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
+        "train_2a_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
+        "train_2a_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/2a/train/'),
         "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/val/'),
 
         "train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
+        "train_18_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
+        "train_18_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/18/train/'),
         "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/18/val/'),
 
         "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
+        "train_cc_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
+        "train_cc_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/cc/train/'),
         "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
 
+
         "random_0e_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
+
         "random_2a_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),
         "random_18_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/18/train/'),
         "random_cc_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/train/'),
@@ -299,6 +284,98 @@ def init_datasets(cfg):
         "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/val/'),
         "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/18/val/'),
         "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/val/'),
+
+#_________________________
+#1
+        "train_1e_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/0e/train'),
+        "train_1e_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/2a/train'),
+        "train_1e_84": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/84/train'),
+        "train_1e_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/cc/train'),
+
+        "train_1e_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/0e/val'),
+        "train_1e_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/2a/val'),
+        "train_1e_84_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/84/val'),
+        "train_1e_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/cc/val'),
+#____________________________
+#2
+        "train_4e_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/0e/train'),
+        "train_4e_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/2a/train'),
+        "train_4e_82": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/82/train'),
+        "train_4e_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/cc/train'),
+
+        "train_4e_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/0e/val'),
+        "train_4e_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/2a/val'),
+        "train_4e_82_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/82/val'),
+        "train_4e_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/cc/val'),
+#____________________________
+#3
+        "train_09_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/0e/train'),
+        "train_09_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/2a/train'),
+        "train_09_82": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/82/train'),
+        "train_09_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/cc/train'),
+
+        "train_09_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/0e/val'),
+        "train_09_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/2a/val'),
+        "train_09_82_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/82/val'),
+        "train_09_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/cc/val'),
+#____________________________
+#4
+"train_26_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/0e/train'),
+"train_26_2a":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/2a/train'),
+"train_26_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/84/train'),
+"train_26_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/cc/train'),
+
+"train_26_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/0e/val'),
+"train_26_2a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/2a/val'),
+"train_26_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/84/val'),
+"train_26_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/cc/val'),
+#____________________________
+#5
+"train_54_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/0e/train'),
+"train_54_2a":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/2a/train'),
+"train_54_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/84/train'),
+"train_54_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/cc/train'),
+          
+"train_54_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/0e/val'),
+"train_54_2a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/2a/val'),
+"train_54_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/84/val'),
+"train_54_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/cc/val'),
+
+#____________________________
+#6
+"train_af_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/0e/train'),
+"train_af_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/22/train'),
+"train_af_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/84/train'),
+"train_af_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/cc/train'),
+
+"train_af_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/0e/val'),
+"train_af_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/22/val'),
+"train_af_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/84/val'),
+"train_af_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/cc/val'),
+
+#____________________________
+#7
+"train_c6_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/0e/train'),
+"train_c6_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/22/train'),
+"train_c6_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/84/train'),
+"train_c6_c1":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/c1/train'),
+
+"train_c6_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/0e/val'),
+"train_c6_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/22/val'),
+"train_c6_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/84/val'),
+"train_c6_c1_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/c1/val'),
+
+#____________________________
+#8
+"train_e7_0a":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/0a/train'),
+"train_e7_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/22/train'),
+"train_e7_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/84/train'),
+"train_e7_c1":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/c1/train'),
+
+"train_e7_0a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/0a/val'),
+"train_e7_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/22/val'),
+"train_e7_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/84/val'),
+"train_e7_c1_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/c1/val'),
 
     }
     return  DATASETS
@@ -342,10 +419,9 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
 
 
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
-    def train_border_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs, border=True)
 
     transform_factory = {
-            #'TRAIN':{'factory':BorderTransformDataset, 'transform_getter':train_border_trans_get},
+            #'TRAIN':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID2':{'factory':TransformDataset, 'transform_getter':train_trans_get},

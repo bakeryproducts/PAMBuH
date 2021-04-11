@@ -51,7 +51,7 @@ _____________
     - Docker
     - scale problem , .65/.5
     - multiply hard even more
-    - Smooth pseudo label
+    - Smooth pseudo label, mix with hard
     - rate x2
     - FFPE SPLITS
     - threshold ?
@@ -60,6 +60,9 @@ _____________
     - augs
     - clean images research
     - tricky image research
+    - aux classifier
+    - mix of fold models
+    - batch size +
 
     - optimizerS schedule
     - checkout domainhead

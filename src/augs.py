@@ -26,6 +26,7 @@ class Augmentator:
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
         self.Alights = partial(AddLightning, imgs_path='input/aug_data/light/') # cfg is partial! there is no cfg.INPUTS here
+        self.FakeGlo = partial(AddFakeGlom, masks_path='input/CUTS/cuts_B_1536x33/masks/') # cfg is partial! there is no cfg.INPUTS here
 
 
     def get_aug(self, kind):
@@ -44,18 +45,17 @@ class Augmentator:
     def rand_crop(self): albu.RandomCrop(self.crop_h,self.crop_w)
     def crop_scale(self): return albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(.3,.7))
     def resize(self): return albu.Resize(self.resize_h, self.resize_w)
-    def blur(self): return albu.OneOf([
+    def blur(self, p): return albu.OneOf([
                         albu.GaussianBlur((3,9)),
                         #albu.MotionBlur(),
                         #albu.MedianBlur()
-                    ], p=.3)
-    def scale(self): return albu.ShiftScaleRotate(0.0625, 0.1, 15, p=.2)
-    def rotate(self): return albu.Rotate(45)
-    def cutout(self): return albu.OneOf([
+                    ], p=p)
+    def scale(self, p): return albu.ShiftScaleRotate(0.0625, 0.2, 15, p=p)
+    def cutout(self, p): return albu.OneOf([
             albu.Cutout(8, 32, 32, 0,p=.3),
             albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.3),
             albu.CoarseDropout(16, 32, 32, 8, 8, 8, 220, p=.4)
-        ],p=.3)
+        ],p=p)
     
     
     def d4(self): return self.compose([
@@ -68,12 +68,12 @@ class Augmentator:
                     #albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.8, 1)), 
                     #albu.CenterCrop(self.crop_h,self.crop_w, p=.2)
                     ], p=1)    
-    def color_jit(self): return albu.OneOf([
+    def color_jit(self, p): return albu.OneOf([
                     #albu.HueSaturationValue(10,15,10),
-                    albu.CLAHE(clip_limit=4),
+                    #albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.3, contrast=0.3, saturation=0.2, hue=0.2)
-                    ], p=0.3)
+                    albu.ColorJitter(brightness=.4, contrast=0.4, saturation=0.1, hue=0.1)
+                    ], p=p)
 
     def aug_ssl(self): return self.compose([
                     albu.OneOf([
@@ -88,7 +88,6 @@ class Augmentator:
                     ])
 
     def aug_light_scale(self): return self.compose([
-                                                    #self.scale(),
                                                     self.multi_crop(), 
                                                     self.d4(),
                                                     self.additional_res(),
@@ -97,10 +96,12 @@ class Augmentator:
 
     def additional_res(self):
         return self.compose([
-                    self.Alights(p=.3),
-                    self.color_jit(),
-                    self.cutout(),
-                    self.blur(),
+                    self.scale(p=.1),
+                    self.FakeGlo(p=.1),
+                    self.Alights(p=.4),
+                    self.color_jit(p=.2),
+                    self.cutout(p=.2),
+                    self.blur(p=.2),
             ], p=.5)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
@@ -188,15 +189,20 @@ class AddLightning(_AddOverlayBase):
         return self._expander(img)
 
 
-class AddGlom(_AddOverlayBase):
-    def __init__(self, masks_path, alpha=1, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
+class AddFakeGlom(_AddOverlayBase):
+    def __init__(self, masks_path, alpha=.5, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
         """Default base_r, base_r, base_b and shift are chosen from hist."""
-        super(AddGlom, self).__init__(get_overlay_fn=self.get_glom, alpha=alpha, p=p)
+        super(AddFakeGlom, self).__init__(get_overlay_fn=self.get_glom, alpha=alpha, p=p)
         self.masks = list(Path(masks_path).rglob('*.png'))
         self.base_r, self.base_g, self.base_b = base_r, base_g, base_b
         self.shift = shift
+        self._shape = 256
 
-    def _expander(self, img): return np.array(img)
+    def _expander(self, img): 
+        img = np.array(img)
+        img = albu.RandomCrop(self._shape, self._shape)(image=img)['image']
+        #print(img.shape)
+        return img
 
     def _aug_with_rand_rgb(self, mask):
         """Returns aug_image shape of (h, w, 4) containing rgb and mask:
@@ -204,8 +210,8 @@ class AddGlom(_AddOverlayBase):
             - mask pixel values are either 0 or 255
         """
         h, w, c = mask.shape  # hw1
-        assert c == 1, "Invalid number of channels"
-        assert np.max(mask) <= 1, "Mask should contain either 0 or 1"
+        assert c == 3, f"Invalid number of channels, {c}"
+        mask = np.expand_dims(mask[...,0], -1)
 
         shift_r, shift_g, shift_b = np.random.randint(-self.shift, self.shift, size=3)
         r = np.full((h, w, 1), self.base_r + shift_r, dtype=np.uint8)  # hw1
@@ -219,11 +225,11 @@ class AddGlom(_AddOverlayBase):
         return self._aug_with_rand_rgb(mask)  # hw4
 
 
-def get_aug(aug_type, transforms_cfg, border=False):
+def get_aug(aug_type, transforms_cfg, tag=False):
     """ aug_type (str): one of `val`, `test`, `light`, `medium`, `hard`
         transforms_cfg (dict): part of main cfg
     """
-    compose = albu.Compose if not border else partial(albu.Compose, additional_targets={'mask1':'mask', 'mask2':'mask'})
+    compose = albu.Compose #if not tag else partial(albu.Compose, additional_targets={'mask1':'mask', 'mask2':'mask'})
     auger = Augmentator(cfg=transforms_cfg, compose=compose)
     return auger.get_aug(aug_type)
 

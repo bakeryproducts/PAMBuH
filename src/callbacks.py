@@ -31,6 +31,11 @@ def get_xb_yb(b):
     #else: return b
     return b[0], b[1]
 
+def get_pred(m, xb):
+    r = m(xb)
+    if isinstance(r, tuple): return r
+    else: return r, None
+
 def get_tag(b):
     #if isinstance(b[1], tuple): return b[1][1]
     if len(b) == 3: return b[2]
@@ -133,7 +138,7 @@ class EarlyStop(sh.callbacks.Callback):
             self.cnt += 1
             if self.cnt >= self.num:
                 self.log_debug(f'EARLY STOP, {self.best}')
-                torch.distributed.destroy_process_group() # ugly way , should use allreduce
+                #torch.distributed.destroy_process_group() # ugly way , should use allreduce
                 raise sh.learner.CancelFitException 
         
 class TBPredictionsCB(sh.callbacks.Callback):
@@ -176,100 +181,42 @@ class TBPredictionsCB(sh.callbacks.Callback):
             self.process_write_predictions()
 
 
-class SelectiveTrainCB(sh.callbacks.Callback):
-    def __init__(self, logger=None): 
-        sh.utils.store_attr(self, locals())
-        self.scaler = torch.cuda.amp.GradScaler() 
-        self._timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
-        ('losses' / Path(self._timestamp)).mkdir()
-        self.counter = defaultdict(int)
-
-    def before_fit(self): self.sbp_pct = self.kwargs['cfg'].TRAIN.SELECTIVE_BP
-    
-    @sh.utils.on_train
-    def before_epoch(self):
-        if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
-        self.learner.unreduced_loss = []
-    
-    def train_step(self):
-        for i in range(len(self.opt.param_groups)): self.learner.opt.param_groups[i]['lr'] = self.lr  
-            
-        xb, yb = self.batch
-        with torch.cuda.amp.autocast():
-            self.learner.preds = self.model(xb)
-            u_loss = self.loss_func(self.preds, yb, reduction='none')
-            self.learner.loss = u_loss.mean() 
-
-        if self.np_batch <= self.sbp_pct:
-            self.scaler.scale(self.learner.loss).backward()
-            self.scaler.step(self.learner.opt)
-            self.scaler.update()
-            
-        self.learner.opt.zero_grad()
-        self.learner.unreduced_loss.extend(u_loss.detach().cpu())
-
-    @sh.utils.on_train
-    def after_epoch(self):
-        l = torch.tensor(self.learner.unreduced_loss)
-        self.learner.dls['TRAIN'].sampler.set_weights(self.losses_to_weights(l))
-
-
-        if self.kwargs['cfg'].PARALLEL.IS_MASTER:
-            ws = np.zeros_like(self.learner.dls['TRAIN'].sampler.sampler.weights)
-            c = 0 
-            for w, idx in zip(l, self.learner.dls['TRAIN'].sampler.dataset.sampler_list):
-                ws[idx] = w
-                if c < l.shape[0] * self.kwargs['cfg'].TRAIN.SELECTIVE_BP:
-                    self.counter[idx]+=1
-                c+=1
-
-            name = f'losses/{self._timestamp}/ll_' + f'{self.n_epoch}'.zfill(5) + '.npy'
-            with open(name, 'wb') as f:
-                np.save(f, ws)
-            name = f'losses/{self._timestamp}/ll_' + f'{self.n_epoch}'.zfill(5) + '.pkl'
-            with open(name, 'wb') as f:
-                pickle.dump(self.counter, f)
-
-    def losses_to_weights(self, l):
-        #return  (1+l)**2
-        return  np.percentile(l.numpy(), l)
-
-
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
+        self.cll = []
 
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
-    
-    def mask_out_border(self, loss, d):
-        mask = torch.zeros_like(loss)
-        mask[:,:,:d , :  ] = 1
-        mask[:,:,:  , :d ] = 1
-        mask[:,:,-d:, :  ] = 1
-        mask[:,:,:  , -d:] = 1
-        return mask
 
+    @sh.utils.on_train
+    def after_epoch(self):
+        #print(np.mean(self.cll))
+        self.cll = []
+    
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
-        border = get_tag(self.batch) 
-        self.learner.preds = self.model(xb)
-        loss = self.loss_func(self.preds, yb, reduction='none')
+        tag = get_tag(self.batch) 
+        self.learner.preds, aux_cl_pred = get_pred(self.model, xb)
+        loss = self.loss_func(self.preds, yb)
 
-        #border_mask = self.mask_out_border(loss, 16)
-        #loss[(border_mask * yb)>0] = 0
+        #if tag is not None:
+        if False:
+            #print(tag.shape, tag.dtype, aux_cl_pred.shape, aux_cl_pred.dtype)
+            cl_mask = yb.sum(axis=(1,2,3)) > 0
+            #print(cl_mask)
+            a,b = aux_cl_pred[:,0][cl_mask], tag.float()[cl_mask]
+            cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b)
+            self.cll.append(cl_loss.detach().item())
+            #print(cl_loss)
+            loss = loss * .5 + .5 * cl_loss
 
-        if border is not None:
-            #print(border.shape, border.sum(), border.max(), yb.sum(), yb.max())
-            mask = border > 0
-            loss[mask] = 0
+        self.learner.loss = loss
 
-        self.learner.loss = loss.mean()
-
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
+        #torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
         self.learner.loss.backward()
         self.learner.opt.step()
         self.learner.opt.zero_grad(set_to_none=True)
@@ -306,14 +253,13 @@ class TrainSSLCB(sh.callbacks.Callback):
 
             xb = xb.cuda()
             with torch.no_grad():
-                self.learner.model_ema.eval()
-                ssl_preds = self.learner.model_ema.module(yb.cuda()).sigmoid()
-                self.learner.model_ema.train()
-                #preds = self.model(yb.cuda()).sigmoid()
+                ssl_preds, _ = get_pred(self.learner.model_ema.module, yb.cuda())
+                ssl_preds = ssl_preds.sigmoid()
+
                 mask = (ssl_preds < self.low_thr) +  (ssl_preds > self.high_thr) # TODO blur? ema?
                 ssl_preds_confident = ssl_preds[mask]
 
-            preds = self.model(xb)
+            preds, _ = get_pred(self.model, xb)
             preds_gt = preds[mask]
             if self.np_batch > .9 and np.random.random() > .5: 
                 # Randomly drop results to TB
@@ -327,7 +273,7 @@ class TrainSSLCB(sh.callbacks.Callback):
 
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
-        self.learner.preds = self.model(xb)
+        self.learner.preds , _ = get_pred(self.model, xb)
         base_loss = self.loss_func(self.learner.preds, yb)
         ssl_loss = self.ssl_step()
 
@@ -365,7 +311,7 @@ class ValCB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
 
             with torch.no_grad():
-                preds = self.model(xb)
+                preds , _ = get_pred(self.model, xb)
 
             #print(preds.shape, yb.shape, xb.shape)
             p = torch.sigmoid(preds.cpu().float())
@@ -380,7 +326,7 @@ class ValCB(sh.callbacks.Callback):
         xb, yb = get_xb_yb(self.batch)
         with torch.no_grad():
             #with torch.cuda.amp.autocast():
-            self.learner.preds = self.model(xb)
+            self.learner.preds, _ = get_pred(self.model, xb)
             self.learner.loss = self.loss_func(self.preds, yb)
                 
 
@@ -405,7 +351,7 @@ class ValEMACB(sh.callbacks.Callback):
             batch_size = xb.shape[0]
 
             with torch.no_grad():
-                preds = self.learner.model_ema.module(xb.cuda())
+                preds, _ = get_pred(self.learner.model_ema.module, xb.cuda())
 
             p = torch.sigmoid(preds.cpu().float())
             p = (p>.5).float()
@@ -417,7 +363,7 @@ class ValEMACB(sh.callbacks.Callback):
     def val_step(self):
         xb, yb = get_xb_yb(self.batch)
         with torch.no_grad():
-            self.learner.preds = self.model(xb)
+            self.learner.preds , _ = get_pred(self.model, xb)
             self.learner.loss = self.loss_func(self.preds, yb)
                 
 

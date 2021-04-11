@@ -9,7 +9,7 @@ from torch import optim
 from torch.nn import init
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel
-from torch.distributed.optim import ZeroRedundancyOptimizer
+#from torch.distributed.optim import ZeroRedundancyOptimizer
 import segmentation_models_pytorch as smp
 
 from add_model import *
@@ -59,11 +59,17 @@ def model_select():
     #model = partial(smp.manet.MAnet, encoder_name='resnet50')
     #model = partial(smp.manet.MAnet, encoder_name='se_resnet50')
 
-    #model = partial(smp.Unet, encoder_name='se_resnet50')
+    #model = partial(smp.UnetPlusPlus, encoder_name='se_resnet50',aux_params={'classes':1, 'activation':None, 'dropout':0}) 
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnetx_032')
+
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032', aux_params={'classes':1, 'activation':None, 'dropout':0})
+    #model = partial(smp.Unet, encoder_name='timm-regnety_032', aux_params={'classes':1, 'activation':None, 'dropout':0})
+
+    #model = partial(smp.Unet, encoder_name='timm-regnety_032')
     model = partial(smp.Unet, encoder_name='timm-regnetx_032')
-    #model = partial(smp.Unet, encoder_name='timm-regnetx_008')
-    #model = smp.Unet
+
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_064')
+    #model = partial(smp.Unet, encoder_name='resnet34', decoder_use_batchnorm=True)
 
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
@@ -101,7 +107,7 @@ def wrap_ddp(cfg, model):
         model = DistributedDataParallel(model, 
                                     device_ids=[cfg.PARALLEL.LOCAL_RANK],
                                     find_unused_parameters=False,
-                                    broadcast_buffers=False)
+                                    broadcast_buffers=True)
     return model
 
 

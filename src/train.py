@@ -7,6 +7,7 @@ from functools import partial
 import torch
 import numpy as np
 from fastprogress.fastprogress import master_bar, progress_bar
+import segmentation_models_pytorch as smp
 
 import data
 import loss
@@ -28,6 +29,9 @@ def clo(logits, targets, reduction='none'):
     return l1*w1 #+ l2*w2
     #return  l2*w2
 
+def sbce(logits, targets, reduction='none'):
+    cr = smp.losses.SoftBCEWithLogitsLoss()
+    return cr(logits, targets)
 
 def start(cfg, output_folder):
     datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
@@ -56,7 +60,11 @@ def start_fold(cfg, output_folder, datasets):
 
     #criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = loss.focal_loss
-    criterion = torch.nn.functional.binary_cross_entropy_with_logits
+    criterion = sbce
+    
+
+    #criterion = loss.symmetric_lovasz
+    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) 
@@ -90,13 +98,18 @@ def start_fold(cfg, output_folder, datasets):
     #scale = 1/2 
     l0,l1,l2, scale = cfg.TRAIN.LRS
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
-    l3, l4 = l0, l1
+    l3, l4 = l0, l1 * .8
+    l5, l6 = l0, l1 * .6
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.1, sh.schedulers.sched_cos(l0,l1)],
-        [.1, sh.schedulers.sched_cos(l1,l3)],
-        [.1, sh.schedulers.sched_cos(l3,l4)],
-        [.7, sh.schedulers.sched_cos(l4,l2)],
+        [.2, sh.schedulers.sched_cos(l0,l1)],
+        [.2, sh.schedulers.sched_cos(l1,l0)],
+        [.2, sh.schedulers.sched_cos(l0,l1)],
+        #[.1, sh.schedulers.sched_cos(l1,l3)],
+        #[.1, sh.schedulers.sched_cos(l3,l4)],
+        #[.1, sh.schedulers.sched_cos(l4,l5)],
+        #[.1, sh.schedulers.sched_cos(l5,l6)],
+        [.4, sh.schedulers.sched_cos(l1,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
 

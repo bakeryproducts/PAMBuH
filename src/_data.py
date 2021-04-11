@@ -140,6 +140,21 @@ class TransformDataset:
     
     def __len__(self): return len(self.dataset)
 
+
+class TagTransformDataset:
+    def __init__(self, dataset, transforms):
+        self.dataset = dataset
+        self.transforms = albu.Compose([]) if transforms is None else transforms
+    
+    def __getitem__(self, idx):
+        img, mask, tag = self.dataset.__getitem__(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        amask = augmented["mask"][0]# as binary
+        amask = amask.view(1,*amask.shape)
+        return augmented["image"], amask, tag
+    
+    def __len__(self): return len(self.dataset)
+
 class BorderTransformDataset:
     def __init__(self, dataset, transforms):
         self.dataset = dataset
@@ -156,6 +171,7 @@ class BorderTransformDataset:
         return augmented["image"], amask, aborder
     
     def __len__(self): return len(self.dataset)
+
 
 class PreloadingDataset:
     def __init__(self, dataset, num_proc=False, progress=None):

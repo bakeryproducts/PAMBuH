@@ -66,7 +66,9 @@ def _infer_func(imgs, transform, scale, model):
     batch = torch.stack(batch,axis=0).cuda()
     #print(batch.shape, batch.dtype, batch.max(), batch.min())
     with torch.no_grad():
-        res = torch.sigmoid(model(batch))
+        res = model(batch)
+        if isinstance(res, tuple): res = res[0]
+        res = torch.sigmoid(res)
 
     #print(res.shape, res.max(), res.min())
     res = rescale(res, scale)
@@ -104,6 +106,8 @@ def get_infer_func(root, use_tta=False):
     cfg_data = CfgParse(root/'cfg.yaml')
     transform = cfg_data.norm() 
     model = get_model(root, cfg_data)
+    aux_cl = True
+    if aux_cl: model = SegModel(model)
     if use_tta: 
         #transforms = tta.Compose( [
         #        tta.HorizontalFlip(),
@@ -118,3 +122,12 @@ def get_infer_func(root, use_tta=False):
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 
 
+class SegModel (torch.nn.Module):
+    def __init__(self, model):
+        super(SegModel, self).__init__()
+        self.m = model
+        
+    def forward(self, x):
+        res = self.m(x)
+        if isinstance(res, tuple): res = res[0]
+        return res

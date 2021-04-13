@@ -245,10 +245,15 @@ def init_datasets(cfg):
 
 
         "backs_cort": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex/'),
-        "backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/'),
-        "backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/'),
-        "backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
-        "backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
+        "backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
+        "backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
+        "backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
+        "backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
+
+        #"backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/'),
+        #"backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/'),
+        #"backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
+        #"backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
 
 
 # _______________________________________________________ 33________________

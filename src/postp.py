@@ -62,6 +62,7 @@ def paste_crop(src, part, block_cd, pad):
 
 def infer_blocks(blocks, do_inference):
     blocks = do_inference(blocks).cpu().numpy()    
+    if isinstance(blocks, tuple): blocks = blocks[0]
     return (255*blocks).astype(np.uint8)
  
 def image_q_reader(q, p, cds, pad):

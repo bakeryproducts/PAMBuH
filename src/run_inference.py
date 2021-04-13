@@ -48,6 +48,7 @@ def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_
         for _ in g:
             pass
 
+    results = dict(results)
     return results 
 
 if __name__ == '__main__':
@@ -56,8 +57,8 @@ if __name__ == '__main__':
 
     """
     #model_folder = 'output/925/'
-    model_folder = Path('output/2021_Apr_10_01_00_26_PAMBUH/')
-    gpu_list = [0,1,2,3]
+    model_folder = Path('output/2021_Apr_13_09_48_24_PAMBUH/')
+    gpu_list = [2,3]
     threshold = int(.4 * 255)
     num_processes = len(gpu_list)
 

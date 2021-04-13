@@ -191,17 +191,35 @@ class TrainCB(sh.callbacks.Callback):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
+        self.cl_gt = []
+        self.cl_pred = []
 
     @sh.utils.on_train
     def after_epoch(self):
+        pass
         #print(np.mean(self.cll))
-        self.cll = []
+        #with torch.no_grad():
+        #    a, b = torch.cat(self.cl_gt), torch.cat(self.cl_pred)
+        #    print('f1: ', loss.f1_loss(a,b))
+        #self.cll = []
     
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
         tag = get_tag(self.batch) 
         self.learner.preds, aux_cl_pred = get_pred(self.model, xb)
         loss = self.loss_func(self.preds, yb)
+
+        if False:
+            a = aux_cl_pred[:,0]
+            b = yb.sum(axis=(1,2,3)) > 256*256/100 # 1%
+            self.cl_gt.append(b.float().detach())
+            t = a.detach().sigmoid()>.5
+            self.cl_pred.append(t.float())
+            #print(a.shape, a.dtype, b.shape, b.dtype)
+            cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b.float(), reduce=False) 
+            #cl_loss[b] = 0
+            #print(loss.item(), cl_loss.mean().item(), cl_loss)
+            loss = loss  + 50 * cl_loss.mean()
 
         #if tag is not None:
         if False:

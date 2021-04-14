@@ -68,7 +68,7 @@ def _infer_func(imgs, transform, scale, model):
     with torch.no_grad():
         res = model(batch)
         if isinstance(res, tuple): res = res[0]
-        res = torch.sigmoid(res)
+        #res = torch.sigmoid(res)
 
     #print(res.shape, res.max(), res.min())
     res = rescale(res, scale)

@@ -1,4 +1,5 @@
 import os
+import math
 import json
 import random
 import argparse
@@ -7,6 +8,7 @@ import itertools
 from pathlib import Path
 from functools import partial
 import multiprocessing as mp
+import multiprocessing.pool
 from contextlib import contextmanager
 from typing import Tuple, List, Dict, Callable
 
@@ -227,3 +229,16 @@ def save_arr_as_tiff(arr: np.ndarray, path: str, nbits: int = 8) -> None:
     dst.close()
     del dst
 
+
+class NoDaemonProcess(mp.Process):
+    # make 'daemon' attribute always return False
+    def _get_daemon(self):
+        return False
+    def _set_daemon(self, value):
+        pass
+    daemon = property(_get_daemon, _set_daemon)
+
+class NoDaemonPool(mp.pool.Pool):
+    Process = NoDaemonProcess
+
+def sigmoid(x): return 1 / (1 + np.exp(-x))

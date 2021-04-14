@@ -34,24 +34,23 @@ def valid_dice(a,b, eps=1e-6):
 
 def calc_all_dices(res_masks, thrs):
     dices = {}
-    for k, mask in res_masks.items():
-        gt = rio.open(f'input/masks/bigmasks/{k.name}').read()
-        mask = mask.astype(np.float16)
-        mask/=255.
+    for img_name, mask_name in res_masks.items():
+        logger.log('DEBUG', f'Dice for {img_name}')
+        gt = rio.open(f'input/masks/bigmasks/{img_name.name}').read()
+        mask = np.load(mask_name)
+        mask = utils.sigmoid(mask)
+        name = img_name.stem
 
         ds = []
         gt = gt > 0
         for thr in tqdm(thrs):
             th_mask = (mask > thr)
             dice = valid_dice(gt, th_mask)
-
             ds.append(dice)
-            print(k.stem, round(thr, 3), round(dice, 4))
 
         ds = np.array(ds)
-        dices[k.stem] = ds
-        print(k.stem, ds.max(), thrs[np.argmax(ds)])
-        
+        print(name, ds.max(), thrs[np.argmax(ds)])
+        dices[name] = ds
     return dices
 
 def calc_common_dice(dices, thrs):
@@ -62,7 +61,7 @@ def calc_common_dice(dices, thrs):
     return np.mean(best_thrs)
 
 #def get_thrs(): return np.arange(.2,.9, .025)
-def get_thrs(): return np.arange(.2,.9, .05)
+def get_thrs(): return np.arange(.2,.9, .1)
 
 def get_stats(dices, thrs):
     df = pd.DataFrame(columns=['name', 'thr', 'score', 'real_thr', 'real_score'])
@@ -82,48 +81,66 @@ def get_stats(dices, thrs):
 
 
 def start_valid(model_folder, split_idx):
-    os.makedirs(f'{model_folder}/predicts/cv/masks', exist_ok=True)
+    os.makedirs(f'{model_folder}/predicts/masks', exist_ok=True)
     gpu_list = [2,3]
-    threshold = 0#int(.4 * 255)
+    threshold = 0
     MERGE=False
     num_processes = len(gpu_list)
-    save_predicts=False
+    save_predicts=True
     use_tta=False
     to_rle=False
+    timestamped = False
 
     img_names = get_split_by_idx(split_idx)
-    res_masks = start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_predicts, use_tta, to_rle)
+    res_masks = start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold, save_predicts, to_rle)
     logger.log('DEBUG', 'Predicts done')
 
-    for k, v in res_masks.items():
-        utils.save_tiff_uint8_single_band(v, f'{model_folder}/predicts/cv/masks/{k.name}', bits=8)
-    logger.log('DEBUG', 'Predicts saved')
+    #for img_name, mask_name in res_masks.items():
+    #    utils.save_tiff_uint8_single_band(v, f'{model_folder}/predicts/cv/masks/{k.name}', bits=8)
+    #logger.log('DEBUG', 'Predicts saved')
 
     thrs = get_thrs()
     dices = calc_all_dices(res_masks, thrs)
     df_result = get_stats(dices, thrs).round(5)
     print(df_result)
-    timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
-    df_result.to_csv(f'{model_folder}/total_{timestamp}.csv')
+    if timestamped:
+        timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
+        total_name = f'{model_folder}/total_{timestamp}.csv'
+    else:
+        total_name = f'{model_folder}/total.csv'
+    df_result.to_csv(total_name)
+    logger.log('DEBUG', f'Total saved {total_name}')
 
     if MERGE:
-        os.makedirs(f'{model_folder}/predicts/cv/combined', exist_ok=True)
+        os.makedirs(f'{model_folder}/predicts/combined', exist_ok=True)
         logger.log('DEBUG', 'Merging masks')
         for k, v in res_masks.items():
             mask_name1 = f'input/masks/bigmasks/{k.name}'
-            mask_name2 = f'{model_folder}/predicts/cv/masks/{k.name}'
-            merge_name = f'{model_folder}/predicts/cv/combined/{k.name}'
+            mask_name2 = f'{model_folder}/predicts/masks/{k.name}'
+            merge_name = f'{model_folder}/predicts/combined/{k.name}'
             logger.log('DEBUG', f'Merging {merge_name}')
             utils.tiff_merge_mask(k, mask_name1, merge_name, mask_name2)
 
+def join_totals(model_folder):
+    totals = list(Path(model_folder).rglob('total.csv'))
+    print(totals)
+    dfs = [pd.read_csv(str(t), index_col=0).loc[:1] for t in totals] 
+
+    df = pd.concat(dfs)
+    s = df.mean()
+    s['name'] = 'AVE'
+    df.loc[len(df)] = s
+    print(df)
+    #df.to_csv(f'{model_folder}/total.csv')
 
 if __name__ == '__main__':
     model_folder = Path('output/2021_Apr_13_09_48_24_PAMBUH/')
-    FOLDS = [0,1,2,3] # or int 
+    FOLDS = [0]#[0,1,2,3] # or int 
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:
             fold_folder = model_folder / f'fold_{split_idx}' 
             start_valid(fold_folder, split_idx)
     else:
         start_valid(model_folder, FOLDS)
-
+    
+    join_totals(model_folder)

@@ -50,22 +50,18 @@ _____________
 5. COde based:
     - Docker
     - scale problem , .65/.5
+    - 512?
     - multiply hard even more
     - Smooth pseudo label, mix with hard
-    - rate x2
-    - FFPE SPLITS
-    - threshold ?
+    - threshold ? Multifold??
     - pseudo on test
-    - highres finetune?
-    - augs
+    - aug even harder for ssl
     - clean images research
     - tricky image research
     - aux classifier
     - mix of fold models
-    - batch size +
-
     - optimizerS schedule
-    - checkout domainhead
+    - join predicts on logits
     - 
 
 

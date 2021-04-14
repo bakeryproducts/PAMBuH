@@ -7,22 +7,16 @@ from functools import partial
 import multiprocessing as mp
 import multiprocessing.pool
 
+import numpy as np
 from tqdm import tqdm
 
 from postp import start, dump_to_csv, mp_func_wrapper
+import utils
+import rle2tiff
 
-class NoDaemonProcess(mp.Process):
-    # make 'daemon' attribute always return False
-    def _get_daemon(self):
-        return False
-    def _set_daemon(self, value):
-        pass
-    daemon = property(_get_daemon, _set_daemon)
 
-class MyPool(mp.pool.Pool):
-    Process = NoDaemonProcess
 
-def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_predicts, use_tta, to_rle):
+def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold=.5, save_predicts=False, to_rle=False):
     logger.log('DEBUG', '\n'.join(list([str(i) for i in img_names])))
 
     m = mp.Manager()
@@ -31,52 +25,56 @@ def start_inf(model_folder, img_names, gpu_list, threshold, num_processes, save_
     for i in gpu_list:
         gpus[i] = False
 
-    starter = partial(start, 
-                        model_folder=model_folder,
-                        threshold=threshold,
-                        gpus=gpus,
-                        results=results,
-                        save_predicts=save_predicts,
-                        use_tta=use_tta,
-                        to_rle=to_rle)
-
+    starter = partial(start, model_folder=model_folder, gpus=gpus, results=results, use_tta=use_tta,)
     starter = partial(mp_func_wrapper, starter)
     args = [(name,) for name in img_names]
 
-    with MyPool(num_processes) as p:    
+    with utils.NoDaemonPool(num_processes) as p:    
         g = tqdm(p.imap(starter, args), total=len(img_names))
         for _ in g:
             pass
 
-    results = dict(results)
-    return results 
+    result_masks = dict(results)
+
+    for img_name, mask_path in result_masks.items():
+        mask = np.load(mask_path)[0]
+        if save_predicts:
+            mask = utils.sigmoid(mask)
+            mask = (mask > threshold).astype(np.uint8)
+
+            out_name = model_folder/'predicts/masks'/img_name.name
+            os.makedirs(str(out_name.parent), exist_ok=True)
+            utils.save_tiff_uint8_single_band(255 * mask, str(out_name), bits=8)
+
+            logger.log('DEBUG', f'{img_name} done')
+            if to_rle:
+                logger.log('DEBUG', f'RLE...')
+                rle = rle2tiff.mask2rle(mask)
+                result_masks[img_name] = rle
+
+    return result_masks 
+
+
 
 if __name__ == '__main__':
-    """
-        MP GPU inference
-
-    """
-    #model_folder = 'output/925/'
-    model_folder = Path('output/2021_Apr_13_09_48_24_PAMBUH/')
-    gpu_list = [2,3]
-    threshold = int(.4 * 255)
+    model_folder = Path('output/2021_Apr_12_19_28_51_PAMBUH/')
+    gpu_list = [0,1,2,3]
+    threshold = .5
     num_processes = len(gpu_list)
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))
     img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
-    #img_names = img_names[:2]
+    img_names = img_names[-2:]
 
-    save_predicts=True
-    use_tta=True
-    to_rle=True
+    use_tta = True
+    save_predicts = True
+    to_rle = True
 
-    results = start_inf(model_folder,
-                        img_names,
-                        gpu_list,
-                        threshold,
-                        num_processes,
-                        save_predicts,
-                        use_tta,
-                        to_rle)
+    results = start_inf(model_folder, 
+                        img_names, 
+                        gpu_list, 
+                        num_processes, 
+                        use_tta, 
+                        threshold=threshold, save_predicts=save_predicts, to_rle=to_rle)
 
-    dump_to_csv(results, model_folder, threshold)
+    if to_rle: dump_to_csv(results, model_folder, threshold)

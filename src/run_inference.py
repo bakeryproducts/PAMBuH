@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))
     img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
-    img_names = img_names[-2:]
+    #img_names = img_names[-2:]
 
     use_tta = True
     save_predicts = True

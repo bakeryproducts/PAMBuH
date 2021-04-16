@@ -1,11 +1,6 @@
 # PAMBuH
 yendik challenge
 
-# TODO
-
-# SUBMIT, which is not complete garbage
-
-1. Preload, precut, presave all data.
 Data structure:
 ```
 -input
@@ -36,21 +31,24 @@ Data structure:
         ...
 ```
 
-2. PostProcess
-_______________
-# Module postprocess
-```python
-Sasha, do me!
-```
-_____________
+# TODO
+
+1. Kgl inference
+    - analyze test images, reading speed MPxls / sec
+    - run some boilerplate code with import pseudo-model from external source
+    - prototype MP loading single GPU inference pipeline (aka postp.py)
+    - make sure that we are reading SUBDATASETS correctly. [3,H,W]
+
+2. AUGs
+
+3. 
 
 
-4. pip package
 
 5. COde based:
-    - Docker
     - scale problem , .65/.5
     - 512?
+    - exclude afa from valid total?
     - multiply hard even more
     - Smooth pseudo label, mix with hard
     - threshold ? Multifold??
@@ -65,6 +63,7 @@ _____________
     - 
 
 
+6. pip package?
 
 
 

@@ -9,7 +9,6 @@ from torch import optim
 from torch.nn import init
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel
-#from torch.distributed.optim import ZeroRedundancyOptimizer
 import segmentation_models_pytorch as smp
 
 from add_model import *
@@ -66,6 +65,7 @@ def model_select():
     #model = partial(smp.Unet, encoder_name='timm-regnety_032', aux_params={'classes':1, 'activation':None, 'dropout':0})
 
     model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+    #model = partial(smp.Unet, encoder_name='timm-efficientnet-b2')
     #model = partial(smp.Unet, encoder_name='resnet18')
     #model = partial(smp.Unet)
 
@@ -76,6 +76,7 @@ def model_select():
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
 
     #model = smp.DeepLabV3Plus
+    #model = partial(smp.DeepLabV3Plus, encoder_name='timm-regnetx_032')
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-efficientnet-b4')#, encoder_depth=4, decoder_channels=[256,128,32,16])
     return model
 
@@ -85,6 +86,7 @@ def build_model(cfg):
         logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
     else: pass
+    init_model(model)
     model = model.cuda()
     model.train()
     return model 

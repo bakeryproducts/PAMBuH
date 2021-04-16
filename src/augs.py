@@ -54,9 +54,8 @@ class Augmentator:
     def cutout(self, p): return albu.OneOf([
             albu.Cutout(8, 32, 32, 0,p=.3),
             albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.3),
-            albu.CoarseDropout(16, 32, 32, 8, 8, 8, 220, p=.4)
+            albu.CoarseDropout(16, 48, 48, 8, 8, 8, 220, p=.4)
         ],p=p)
-    
     
     def d4(self): return self.compose([
                     albu.Flip(),
@@ -68,11 +67,12 @@ class Augmentator:
                     #albu.RandomResizedCrop(self.crop_h, self.crop_w, scale=(0.8, 1)), 
                     #albu.CenterCrop(self.crop_h,self.crop_w, p=.2)
                     ], p=1)    
+
     def color_jit(self, p): return albu.OneOf([
                     #albu.HueSaturationValue(10,15,10),
                     #albu.CLAHE(clip_limit=4),
                     #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.4, contrast=0.4, saturation=0.1, hue=0.1)
+                    albu.ColorJitter(brightness=.4, contrast=0.3, saturation=0.1, hue=0.1)
                     ], p=p)
 
     def aug_ssl(self): return self.compose([

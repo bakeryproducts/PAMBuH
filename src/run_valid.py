@@ -61,7 +61,7 @@ def calc_common_dice(dices, thrs):
     return np.mean(best_thrs)
 
 #def get_thrs(): return np.arange(.2,.9, .025)
-def get_thrs(): return np.arange(.2,.9, .1)
+def get_thrs(): return np.arange(.2,.9, .05)
 
 def get_stats(dices, thrs):
     df = pd.DataFrame(columns=['name', 'thr', 'score', 'real_thr', 'real_score'])
@@ -80,24 +80,28 @@ def get_stats(dices, thrs):
     return df
 
 
-def start_valid(model_folder, split_idx):
+def start_valid(model_folder, split_idx, do_inf):
     os.makedirs(f'{model_folder}/predicts/masks', exist_ok=True)
     gpu_list = [2,3]
     threshold = 0
     MERGE=False
     num_processes = len(gpu_list)
     save_predicts=True
-    use_tta=False
+    use_tta=True
     to_rle=False
     timestamped = False
 
     img_names = get_split_by_idx(split_idx)
-    res_masks = start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold, save_predicts, to_rle)
+    if do_inf:
+        res_masks = start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold, save_predicts, to_rle)
+    else:
+        res_masks = {}
+        for i in img_names:
+            res_masks[i] = model_folder/'predicts/raw'/(i.stem + '.npy')
+        print(res_masks)
+
     logger.log('DEBUG', 'Predicts done')
 
-    #for img_name, mask_name in res_masks.items():
-    #    utils.save_tiff_uint8_single_band(v, f'{model_folder}/predicts/cv/masks/{k.name}', bits=8)
-    #logger.log('DEBUG', 'Predicts saved')
 
     thrs = get_thrs()
     dices = calc_all_dices(res_masks, thrs)
@@ -127,20 +131,25 @@ def join_totals(model_folder):
     dfs = [pd.read_csv(str(t), index_col=0).loc[:1] for t in totals] 
 
     df = pd.concat(dfs)
+    df = df[df['name'] != 'afa5e8098']
     s = df.mean()
     s['name'] = 'AVE'
     df.loc[len(df)] = s
     print(df)
-    #df.to_csv(f'{model_folder}/total.csv')
+    df = df.round(5)
+    df.to_csv(f'{model_folder}/total_stats.csv')
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_13_09_48_24_PAMBUH/')
-    FOLDS = [0]#[0,1,2,3] # or int 
+    model_folder = Path('output/2021_Apr_16_13_26_27_PAMBUH/')
+    FOLDS = 0#[0,1,2,3] # or int 
+    do_inf = True
+
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:
             fold_folder = model_folder / f'fold_{split_idx}' 
-            start_valid(fold_folder, split_idx)
+            start_valid(fold_folder, split_idx, do_inf=do_inf)
+        join_totals(model_folder)
     else:
-        start_valid(model_folder, FOLDS)
+        start_valid(model_folder, FOLDS, do_inf=do_inf)
     
-    join_totals(model_folder)
+

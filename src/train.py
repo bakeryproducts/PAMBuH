@@ -96,16 +96,16 @@ def start_fold(cfg, output_folder, datasets):
     #scale = 1/2 
     l0,l1,l2, scale = cfg.TRAIN.LRS
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
-    l3, l4 = l0, l1 * .8
-    l5, l6 = l0, l1 * .6
+    l3, l4 = l0, l1 * 1
+    l5, l6 = l0, l1 * 1
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.3, sh.schedulers.sched_cos(l0,l1)],
+        [.2, sh.schedulers.sched_cos(l0,l1)],
         #[.1, sh.schedulers.sched_cos(l1,l3)],
         #[.1, sh.schedulers.sched_cos(l3,l4)],
         #[.1, sh.schedulers.sched_cos(l4,l5)],
         #[.1, SH.SCHEDULERS.SCHED_COS(L5,L6)],
-        [.7, sh.schedulers.sched_cos(l1,l2)],
+        [.8, sh.schedulers.sched_cos(l1,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
 

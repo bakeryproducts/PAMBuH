@@ -102,7 +102,7 @@ class Augmentator:
                     self.color_jit(p=.2),
                     self.cutout(p=.2),
                     self.blur(p=.2),
-            ], p=.5)
+            ], p=.3)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])

@@ -64,15 +64,18 @@ def model_select():
     #model = partial(smp.Unet, encoder_name='timm-regnetx_032', aux_params={'classes':1, 'activation':None, 'dropout':0})
     #model = partial(smp.Unet, encoder_name='timm-regnety_032', aux_params={'classes':1, 'activation':None, 'dropout':0})
 
-    model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+    #model = partial(smp.Unet, encoder_name='timm-resnest50d')
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032', encoder_weights=None)
     #model = partial(smp.Unet, encoder_name='timm-efficientnet-b2')
     #model = partial(smp.Unet, encoder_name='resnet18')
     #model = partial(smp.Unet)
 
-    #model = partial(smp.Unet, encoder_name='timm-regnetx_064')
+    model = partial(smp.Unet, encoder_name='timm-regnetx_064')
     #model = partial(smp.Unet, encoder_name='resnet34', decoder_use_batchnorm=True)
 
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
+    #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_016')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
 
     #model = smp.DeepLabV3Plus
@@ -86,7 +89,12 @@ def build_model(cfg):
         logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
     else: pass
-    init_model(model)
+
+    # INIT _____________________________________________________________________________
+    # INIT _____________________________________________________________________________
+    # INIT _____________________________________________________________________________
+    #init_model(model)
+    
     model = model.cuda()
     model.train()
     return model 

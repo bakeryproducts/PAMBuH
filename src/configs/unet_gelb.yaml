@@ -4,22 +4,21 @@ OUTPUTS: output
 DATA:
   TRAIN:
     #DATASETS: ['train_0e_33', 'random_0e_33']
-    DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e']
     #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e']
-    #FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e'],
-    #        ['train_2a_33_frozen', 'train_2a_33_soft', 'random_2a_33', 'backs_cort_2a', 'backs_fp_2a'],
-    #        ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18'],
-    #        ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']]
+    FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e'],
+            ['train_2a_33_frozen', 'train_2a_33_soft', 'random_2a_33', 'backs_cort_2a', 'backs_fp_2a'],
+            ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18'],
+            ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']]
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
     MULTIPLY: {'rate':1}
   VALID:
-    DATASETS: ['val_0e_33', 'random_0e_33_val']
-    #FOLDS: [['val_0e_33', 'random_0e_33_val'],
-    #        ['val_2a_33', 'random_2a_33_val'],
-    #        ['val_18_33', 'random_18_33_val'],
-    #        ['val_cc_33', 'random_cc_33_val']]
+    #DATASETS: ['val_0e_33', 'random_0e_33_val']
+    FOLDS: [['val_0e_33', 'random_0e_33_val'],
+            ['val_2a_33', 'random_2a_33_val'],
+            ['val_18_33', 'random_18_33_val'],
+            ['val_cc_33', 'random_cc_33_val']]
     PRELOAD: False
   SSL:
     #DATASETS: ['ssl_test', 'ssl_val']
@@ -49,19 +48,19 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00002, 0.0002, 0.00002, 1]
+  LRS: [0.00002, 0.0003, 0.00002, 1]
   DOWNSCALE: 3
-  NUM_FOLDS: 1
+  NUM_FOLDS: 4
   SELECTIVE_BP: 1.
   HARD_MULT: 2
   EMA: 0.995
   #WEIGHTS: 'input/scores_color_train.pkl'
   #INIT_MODEL: 'output/2021_Apr_03_23_30_39_PAMBUH/models/'
   AMP: True
-  GPUS: [0,1]
+  GPUS: [2,3]
   NUM_WORKERS: 8
   
-  SAVE_STEP: 1.
+  SAVE_STEP: .9
   SCALAR_STEP: 1
   TB_STEP: 4
   

@@ -40,15 +40,16 @@ def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, thresho
         mask = np.load(mask_path)[0]
         if save_predicts:
             mask = utils.sigmoid(mask)
-            mask = (mask > threshold).astype(np.uint8)
+            #mask = (mask > threshold).astype(np.uint8)
 
             out_name = model_folder/'predicts/masks'/img_name.name
             os.makedirs(str(out_name.parent), exist_ok=True)
-            utils.save_tiff_uint8_single_band(255 * mask, str(out_name), bits=8)
+            utils.save_tiff_uint8_single_band((255 * mask).astype(np.uint8), str(out_name), bits=8)
 
             logger.log('DEBUG', f'{img_name} done')
             if to_rle:
                 logger.log('DEBUG', f'RLE...')
+                mask = (mask > threshold).astype(np.uint8)
                 rle = rle2tiff.mask2rle(mask)
                 result_masks[img_name] = rle
 

@@ -42,10 +42,10 @@ def ensemble_folds(folders, dst_path):
     
 
 if __name__ == '__main__':
-    FOLDS = True
+    FOLDS = False
     folders = [
-            Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
-            Path('output/2021_Apr_15_22_15_39_PAMBUH/'),
+            Path('output/2021_Apr_16_13_26_27_PAMBUH/'),
+            Path('output/2021_Apr_16_10_14_06_PAMBUH/'),
             ]
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     dst_path = Path(f'output/{timestamp}')

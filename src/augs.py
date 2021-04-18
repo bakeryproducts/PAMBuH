@@ -189,6 +189,43 @@ class AddLightning(_AddOverlayBase):
         return self._expander(img)
 
 
+class AddWhitening(albu.core.transforms_interface.ImageOnlyTransform):
+    def __init__(self, p=.5, mean=(205, 185, 195), std=(17, 24, 17), rand_shift=5):
+        """
+        p: probability to apply whitening transform
+        """
+        super(AddWhitening, self).__init__(p=p)
+        self.mean, self.std = self.reshape_tuple(mean), self.reshape_tuple(std)
+        self.rand_shift = rand_shift
+
+    def add_rand_shift(self, arr):
+        """Adds random shift to array.
+        """
+        return arr + np.random.rand(*arr.shape) * 2 * self.rand_shift - self.rand_shift
+
+    def reshape_tuple(self, in_tuple):
+        """Returns array of shape (1, 1, len(in_tuple)) to broadcast later.
+        """
+        return np.array(in_tuple).reshape(1, 1, -1)
+
+    def modif_mean_and_std(self, img):
+        """Modifies/changes img_mean and img_std to img and mean.
+            IMG, (h, w, 3)
+        """
+        assert img.shape[2] == 3  # c
+        assert img.shape[0] == img.shape[1]  # hw
+
+        mean, std = self.add_rand_shift(self.mean), self.add_rand_shift(self.std)
+        img_mean, image_std = self.reshape_tuple(img.mean(axis=(0, 1))), \
+                              self.reshape_tuple(img.std(axis=(0, 1)))
+        ratio = std / img.std()
+        img = (img - img_mean) * ratio + mean
+        return img.astype(np.uint8)
+
+    def apply(self, img, **params):
+        return self.modif_mean_and_std(img)
+
+
 class AddFakeGlom(_AddOverlayBase):
     def __init__(self, masks_path, alpha=.5, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
         """Default base_r, base_r, base_b and shift are chosen from hist."""

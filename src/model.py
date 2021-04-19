@@ -71,12 +71,15 @@ def model_select():
     #model = partial(smp.Unet, encoder_name='resnet18')
     #model = partial(smp.Unet)
 
-    model = partial(smp.Unet, encoder_name='timm-regnetx_064')
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+    #model = partial(smp.Unet, encoder_name='se_resnet50')
+    #model = partial(smp.Unet)
     #model = partial(smp.Unet, encoder_name='resnet34', decoder_use_batchnorm=True)
 
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
     #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_016')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
+    model = partial(smp.manet.MAnet)
 
     #model = smp.DeepLabV3Plus
     #model = partial(smp.DeepLabV3Plus, encoder_name='timm-regnetx_032')
@@ -90,11 +93,6 @@ def build_model(cfg):
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
     else: pass
 
-    # INIT _____________________________________________________________________________
-    # INIT _____________________________________________________________________________
-    # INIT _____________________________________________________________________________
-    #init_model(model)
-    
     model = model.cuda()
     model.train()
     return model 
@@ -103,9 +101,6 @@ def get_optim(cfg, model):
     base_lr = 1e-4# should be overriden in LR scheduler anyway
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
-    #if cfg.PARALLEL.DDP:   
-    #    optimizer = ZeroRedundancyOptimizer(tencent_trick(model), optim=optim.AdamW, lr=lr)
-    #else:
     opt = optim.AdamW
     opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)

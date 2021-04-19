@@ -10,6 +10,7 @@ import numpy as np
 import torch
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
+import segmentation_models_pytorch as smp
 
 import ema
 import utils
@@ -219,7 +220,7 @@ class TrainCB(sh.callbacks.Callback):
             cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b.float(), reduce=False) 
             #cl_loss[b] = 0
             #print(loss.item(), cl_loss.mean().item(), cl_loss)
-            loss = loss  + 50 * cl_loss.mean()
+            loss = loss  + 10 * cl_loss.mean()
 
         #if tag is not None:
         if False:
@@ -245,17 +246,24 @@ class TrainCB(sh.callbacks.Callback):
 class TrainSSLCB(sh.callbacks.Callback):
     def __init__(self, ssl_dl, logger=None): 
         sh.utils.store_attr(self, locals())
-        self.epoch_start_ssl = 10
+        self.epoch_start_ssl = 3
         #self.ssl_criterion = loss.symmetric_lovasz
-        self.ssl_criterion = torch.nn.BCEWithLogitsLoss()
-        self.ssl_loss_scale = 1
+        #self.ssl_criterion = torch.nn.BCEWithLogitsLoss(reduction='none')
+        self.ssl_criterion = smp.losses.SoftBCEWithLogitsLoss(reduction='none', smooth_factor=.1)
+        self.ssl_loss_scale = .1
         self.high_thr = .8
         self.low_thr = .2
+        self.ssl_l = [0]
 
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
+        if self.kwargs['cfg'].PARALLEL.DDP: self.ssl_dl.sampler.set_epoch(self.n_epoch)
         self.ssl_it = iter(self.ssl_dl)
+        self.ssl_loss_scale = min(self.ssl_loss_scale * 1.05 , 2)
+
+        self.log_debug(f'BASE: {np.mean(self.ssl_l)}, {self.ssl_loss_scale}')
+        self.ssl_l = [0]
 
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
@@ -271,21 +279,24 @@ class TrainSSLCB(sh.callbacks.Callback):
 
             xb = xb.cuda()
             with torch.no_grad():
-                ssl_preds, _ = get_pred(self.learner.model_ema.module, yb.cuda())
-                ssl_preds = ssl_preds.sigmoid()
-
-                mask = (ssl_preds < self.low_thr) +  (ssl_preds > self.high_thr) # TODO blur? ema?
-                ssl_preds_confident = ssl_preds[mask]
+                ssl_yb, _ = get_pred(self.learner.model_ema.module, yb.cuda())
+                ssl_yb = ssl_yb.sigmoid()
+                ssl_yb[ssl_yb<self.low_thr] = 0
+                ssl_yb[ssl_yb>self.high_thr] = 1
 
             preds, _ = get_pred(self.model, xb)
-            preds_gt = preds[mask]
+            ssl_loss = self.ssl_criterion(preds, ssl_yb) 
+            with torch.no_grad():
+                mask = (ssl_yb > self.low_thr) * (ssl_yb < self.high_thr) 
+            ssl_loss[mask] = 0
+            ssl_loss = ssl_loss.mean()
+
             if self.np_batch > .9 and np.random.random() > .5: 
                 # Randomly drop results to TB
                 #print(xbs.shape, ybs.shape, preds.shape)
-                self.learner.batch = (xb,ssl_preds)
+                ssl_yb[mask] = 0
+                self.learner.batch = (xb,ssl_yb)
                 self.learner.preds = preds
-
-            ssl_loss = self.ssl_criterion(preds_gt, ssl_preds_confident) * self.ssl_loss_scale
 
         return ssl_loss
 
@@ -296,8 +307,9 @@ class TrainSSLCB(sh.callbacks.Callback):
         ssl_loss = self.ssl_step()
 
         if ssl_loss is not None:
-            self.log_debug(f'BASE: {base_loss.item()}, SSL:{ssl_loss.item()}')
-            loss = (base_loss + ssl_loss) / 2
+            #self.log_debug(f'BASE: {base_loss.item()}, SSL:{ssl_loss.item()}, SCALED:{self.ssl_loss_scale * ssl_loss.item()}')
+            self.ssl_l.append(ssl_loss.item())
+            loss = base_loss + ssl_loss * self.ssl_loss_scale
         else: loss = base_loss
 
         loss.backward()
@@ -305,7 +317,7 @@ class TrainSSLCB(sh.callbacks.Callback):
         self.learner.opt.step()
         self.learner.opt.zero_grad(set_to_none=True)
 
-        if self.kwargs['cfg'].TRAIN.EMA: self.learner.model_ema.update(self.model, self.kwargs['cfg'].TRAIN.EMA)
+        if self.kwargs['cfg'].TRAIN.EMA: self.learner.model_ema.update(self.model)
 
 
 class ValCB(sh.callbacks.Callback):
@@ -420,3 +432,4 @@ class CheckpointCB(sh.callbacks.Callback):
                 save = True
                 self.pct_counter += self.save_step
         
+        if save: self.do_saving('_AE')

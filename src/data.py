@@ -46,10 +46,10 @@ class SSLDataset:
     def __init__(self, root, crop_size):
         self.dataset = ImageDataset(root, '*/*.png')
         self.dataset.process_item = expander
-        self.dataset = MultiplyDataset(self.dataset, 6)
+        self.dataset = MultiplyDataset(self.dataset, 8)
         self.d4 = albu.Compose([
-                                albu.ShiftScaleRotate(0.0625, 0.1, 45, p=.2), 
                                 albu.RandomCrop(*crop_size),
+                                albu.ShiftScaleRotate(0.0625, 0.1, 45, p=.3), 
                                 albu.Flip(),
                                 albu.RandomRotate90()
                                 ])
@@ -213,7 +213,7 @@ def init_datasets(cfg):
     AuxFrozenDataset = partial(SegmentDataset, hard_mult=mult, frozen=True)
     #AuxDataset = partial(TagSegmentDataset, hard_mult=mult)
     #AuxFrozenDataset = partial(TagSegmentDataset, hard_mult=mult, frozen=True)
-    AuxFPDataset = partial(SegmentDataset, hard_mult=3)
+    AuxFPDataset = partial(SegmentDataset, hard_mult=4)
 
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
@@ -232,23 +232,22 @@ def init_datasets(cfg):
         "train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/'),
         "val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/'),
 
-        "random_0e": AuxDataset(DATA_DIR/'backs/random_020_splits/0e/train/'),
-        "random_2a": AuxDataset(DATA_DIR/'backs/random_020_splits/2a/train/'),
-        "random_18": AuxDataset(DATA_DIR/'backs/random_020_splits/18/train/'),
-        "random_cc": AuxDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
+        "random_0e": SegmentDataset(DATA_DIR/'backs/random_020_splits/0e/train/'),
+        "random_2a": SegmentDataset(DATA_DIR/'backs/random_020_splits/2a/train/'),
+        "random_18": SegmentDataset(DATA_DIR/'backs/random_020_splits/18/train/'),
+        "random_cc": SegmentDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
 
 
         "sclero": SegmentDataset(DATA_DIR/'scleros_glomi/scle_cuts_1024/'), 
 
-        "ssl_test": SslDS(DATA_DIR/'ssl_cortex'),
+        "ssl_test": SslDS(DATA_DIR/'ssl/test/imgs'),
         "ssl_val": SslDS(DATA_DIR/'SPLITS/f_split/0e/val/imgs'),
 
-
         "backs_cort": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex/'),
-        "backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
-        "backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
-        "backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
-        "backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
+        "backs_cort_0e": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
+        "backs_cort_2a": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
+        "backs_cort_18": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
+        "backs_cort_cc": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
 
         "backs_fp_0e": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/0e/train/'),
         "backs_fp_2a": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/2a/train/'),
@@ -284,16 +283,15 @@ def init_datasets(cfg):
         "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
 
 
-        "random_0e_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
+        "random_0e_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/0e/train/'),
+        "random_2a_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/2a/train/'),
+        "random_18_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/18/train/'),
+        "random_cc_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/cc/train/'),
 
-        "random_2a_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),
-        "random_18_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/18/train/'),
-        "random_cc_33": AuxDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/train/'),
-
-        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/val/'),
-        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/val/'),
-        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/18/val/'),
-        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/val/'),
+        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/0e/val/'),
+        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/2a/val/'),
+        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/18/val/'),
+        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/cc/val/'),
 
 #_________________________
 #1
@@ -449,9 +447,6 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
     #TODO refact
     if isinstance(datasets['TRAIN'], list):
         # fold mode
-        mean, std = mean_std_dataset(datasets['TRAIN'][0])
-        if cfg.TRANSFORMERS.STD == (0,) and cfg.TRANSFORMERS.MEAN == (0,):
-            update_mean_std(cfg, mean, std)
 
         res_datasets = {'TRAIN':[], 'VALID':[]}
         for tds, vds in zip(datasets['TRAIN'], datasets['VALID']):
@@ -489,11 +484,10 @@ def build_dataloaders(cfg, datasets, selective=False):
 
 
 def build_dataloader(cfg, dataset, mode, selective):
-    drop_last = False
+    drop_last = True
     sampler = None 
 
-
-    if cfg.PARALLEL.DDP and mode == 'TRAIN':
+    if cfg.PARALLEL.DDP and (mode == 'TRAIN' or mode == 'SSL'):
         if sampler is None:
             sampler = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
 

@@ -68,10 +68,14 @@ def calc_all_dices(res_masks, thrs, use_torch):
 
 def calc_common_dice(dices, thrs):
     best_thrs = []
+    dd = []
     for k, v in dices.items():
-        thr = thrs[np.argmax(v)]
-        best_thrs.append(thr)
-    return np.mean(best_thrs)
+        dd.append(v)
+
+    dd = np.array(dd)
+    thr = thrs[np.argmax(dd.sum(0))]
+    #print(dd, dd.sum(0))
+    return thr
 
 #def get_thrs(): return np.arange(.2,.9, .025)
 def get_thrs(): return np.arange(.2,.9, .01)
@@ -108,11 +112,8 @@ def join_totals(model_folder):
 
 def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice):
     os.makedirs(f'{model_folder}/predicts/masks', exist_ok=True)
-    gpu_list = gpus
-    #gpu_list = [0,]
     threshold = 0
-    MERGE = merge
-    num_processes = len(gpu_list)
+    num_processes = len(gpus)
     save_predicts=True
     use_tta=True
     to_rle=False
@@ -120,7 +121,7 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
     img_names = get_split_by_idx(split_idx)
     if do_inf:
-        res_masks = start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold, save_predicts, to_rle)
+        res_masks = start_inf(model_folder, img_names, gpus, num_processes, use_tta, threshold, save_predicts, to_rle)
     else:
         res_masks = {}
         for i in img_names:
@@ -143,7 +144,7 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
         df_result.to_csv(total_name)
         logger.log('DEBUG', f'Total saved {total_name}')
 
-    if MERGE:
+    if merge:
         os.makedirs(f'{model_folder}/predicts/combined', exist_ok=True)
         logger.log('DEBUG', 'Merging masks')
         for k, v in res_masks.items():
@@ -157,11 +158,12 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 if __name__ == '__main__':
     model_folder = Path('output/2021_Apr_17_00_36_20_PAMBUH/')
     FOLDS = [0,1,2,3] # or int 
-    do_inf = True
-    do_dice = False
+    do_inf = False
+    do_dice = True
     use_torch = not do_inf
-    merge = True
+    merge = False
     gpus = [2,3]
+    #gpus = [0]
 
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:

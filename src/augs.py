@@ -50,7 +50,7 @@ class Augmentator:
                         #albu.MotionBlur(),
                         #albu.MedianBlur()
                     ], p=p)
-    def scale(self, p): return albu.ShiftScaleRotate(0.0625, 0.2, 15, p=p)
+    def scale(self, p): return albu.ShiftScaleRotate(0.1, 0.2, 45, p=p)
     def cutout(self, p): return albu.OneOf([
             albu.Cutout(8, 32, 32, 0,p=.3),
             albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.3),
@@ -69,23 +69,30 @@ class Augmentator:
                     ], p=1)    
 
     def color_jit(self, p): return albu.OneOf([
-                    #albu.HueSaturationValue(10,15,10),
-                    #albu.CLAHE(clip_limit=4),
-                    #albu.RandomBrightnessContrast(.3, .3),
-                    albu.ColorJitter(brightness=.4, contrast=0.3, saturation=0.1, hue=0.1)
+                    albu.HueSaturationValue(10,15,10),
+                    albu.CLAHE(clip_limit=4),
+                    albu.RandomBrightnessContrast(.3, .3),
+                    albu.ChannelShuffle(),
+                    #albu.ColorJitter(brightness=.4, contrast=0.3, saturation=0.1, hue=0.1)
                     ], p=p)
 
     def aug_ssl(self): return self.compose([
+                                self._ssl(p=1.),
+                                self.norm()
+                                ])
+    
+    def _ssl(self, p): return self.compose([
+                    self.FakeGlo(p=.3),
+                    self.Alights(p=.7),
                     albu.OneOf([
                         albu.HueSaturationValue(30,40,30),
                         albu.CLAHE(clip_limit=4),
                         albu.RandomBrightnessContrast((-0.5, .5), .3),
                         albu.ColorJitter(brightness=.5, contrast=0.5, saturation=0.3, hue=0.3)
-                    ], p=1),
-                    self.cutout(),
-                    self.blur(),
-                    self.norm()
-                    ])
+                    ], p=.5),
+                    self.cutout(p=.3),
+                    self.blur(p=.2),
+                    ], p=p)
 
     def aug_light_scale(self): return self.compose([
                                                     self.multi_crop(), 
@@ -96,13 +103,13 @@ class Augmentator:
 
     def additional_res(self):
         return self.compose([
-                    self.scale(p=.1),
-                    self.FakeGlo(p=.1),
-                    self.Alights(p=.4),
-                    self.color_jit(p=.2),
+                    self.scale(p=.2),
+                    self.FakeGlo(p=.2),
+                    self.Alights(p=.3),
+                    self.color_jit(p=.3),
                     self.cutout(p=.2),
                     self.blur(p=.2),
-            ], p=.3)
+            ], p=.4)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
@@ -190,7 +197,7 @@ class AddLightning(_AddOverlayBase):
 
 
 class AddFakeGlom(_AddOverlayBase):
-    def __init__(self, masks_path, alpha=.5, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
+    def __init__(self, masks_path, alpha=.7, p=.5, base_r=145, base_g=85, base_b=155, shift=30):
         """Default base_r, base_r, base_b and shift are chosen from hist."""
         super(AddFakeGlom, self).__init__(get_overlay_fn=self.get_glom, alpha=alpha, p=p)
         self.masks = list(Path(masks_path).rglob('*.png'))

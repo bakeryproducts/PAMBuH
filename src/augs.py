@@ -199,6 +199,8 @@ class AddLightning(_AddOverlayBase):
 class AddWhitening(albu.core.transforms_interface.ImageOnlyTransform):
     def __init__(self, p=.5, mean=(205, 185, 195), std=(17, 24, 17), rand_shift=5):
         """
+        # TODO whitening is bad choice for a name, as it already mean some other cv op
+        # TODO research for structure-based aug
         p: probability to apply whitening transform
         """
         super(AddWhitening, self).__init__(p=p)

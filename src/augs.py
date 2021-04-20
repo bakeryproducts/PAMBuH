@@ -4,7 +4,7 @@ import torch  # to tensor transform
 import albumentations as albu
 import albumentations.pytorch as albu_pt
 
-from src._add_augs import AddLightning, AddFakeGlom
+from _add_augs import AddLightning, AddFakeGlom
 
 
 class ToTensor(albu_pt.ToTensorV2):

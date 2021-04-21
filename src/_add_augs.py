@@ -8,74 +8,38 @@ import albumentations as albu
 from PIL import Image
 
 
-class AddPalingRegion(albu.core.transforms_interface.ImageOnlyTransform):
-    def __init__(self, p=.5, alpha=0.7, region_alpha=0.7, thresh_shift=10, alpha_shift=0.05,
-                 max_gray_val=255):
+class AddGammaCorrection(albu.core.transforms_interface.ImageOnlyTransform):
+    def __init__(self, p=.5, max_gray_val=255, gamma1=2.5, gamma2=4.0):
         """
-        p: probability to apply paling transform
+        p: probability to apply whitening transform
         """
-        super(AddPalingRegion, self).__init__(p=p)
-        self.alpha = alpha
-        self.region_alpha = region_alpha
-        self.thresh_shift = thresh_shift
-        self.alpha_shift = alpha_shift
+        super(AddGammaCorrection, self).__init__(p=p)
         self.max_gray_val = max_gray_val
+        self.gamma1, self.gamma2 = gamma1, gamma2
 
-    @staticmethod
-    def _add_rand_shift(number, shift):
-        """Adds random shift to number.
-        """
-        return number + np.random.rand() * 2 * shift - shift
-
-    def _get_thresholds(self, img):
-        """Returns thresholds.
-        """
-        mean, std = img.mean(), img.std()
-        thin_border_thresh = AddPalingRegion._add_rand_shift(mean - std, self.thresh_shift)
-        full_region_thresh = AddPalingRegion._add_rand_shift(mean, self.thresh_shift)
-        return thin_border_thresh, full_region_thresh
-
-    def _get_region_mask(self, img):
-        """Returns mask of region shape of (h,w).
-            IMG, (h, w, 3)
-        """
-        thin_border_thresh, full_region_thresh = self._get_thresholds(img)
-        gray = rgb2gray(img).astype(np.uint8)
-
-        _, thin_border_mask = cv2.threshold(gray, thin_border_thresh,
-                                            self.max_gray_val, cv2.THRESH_BINARY_INV)  # hw
-        _, full_region_mask = cv2.threshold(gray, full_region_thresh,
-                                            self.max_gray_val, cv2.THRESH_BINARY_INV)  # hw
-        return full_region_mask - thin_border_mask  # hw
-
-    def _get_white_img_uint8(self, shape):
-        """Returns white img.
-        """
-        return self.max_gray_val * np.ones(shape).astype(np.uint8)
-
-    def _add_paling(self, img):
-        """Modifies/changes img_mean and img_std to img and mean.
+    def _adgust_gamma(self, img, gamma):
+        """Applies gamma correction.
             IMG, (h, w, 3)
         """
         assert img.shape[2] == 3  # c
         assert img.shape[0] == img.shape[1]  # hw
-        h, w, c = img.shape
 
-        region_mask = self._get_region_mask(img)  # hw
-        mask = np.dstack((region_mask, region_mask, region_mask))  # hw3
-        mask_bit = (mask / 255).astype(bool)  # hw3 containing either 1 or 0
+        inv_gamma = 1.0 / gamma
+        table = np.array([((i / self.max_gray_val) ** inv_gamma) * self.max_gray_val
+                          for i in np.arange(0, self.max_gray_val + 1)]).astype(np.uint8)
+        return cv2.LUT(img, table).astype(np.uint8)
 
-        alpha = AddPalingRegion._add_rand_shift(self.alpha, self.alpha_shift)
-        white_img = self._get_white_img_uint8((h, w, c))  # hw3
-        img = cv2.addWeighted(img, alpha, white_img, 1 - alpha, 0.0)  # Pale full image
+    def _combine_corrections(self, img):
+        img1 = self._adgust_gamma(img, self.gamma1)
+        img2 = self._adgust_gamma(img, self.gamma2)
 
-        region_alpha = AddPalingRegion._add_rand_shift(self.region_alpha, self.alpha_shift)
-        blended = cv2.addWeighted(img, region_alpha, mask, 1 - region_alpha, 0.0) # Pale regions
-        img[mask_bit] = blended[mask_bit]
-        return img.astype(np.uint8)
+        thresh = img.mean() - 0.8 * img.std()
+        mask = img.mean(2) < thresh
+        img2[mask] = img1[mask]
+        return img2
 
     def apply(self, img, **params):
-        return self._add_paling(img)
+        return self._combine_corrections(img)
 
 
 class _AddOverlayBase(albu.core.transforms_interface.ImageOnlyTransform):

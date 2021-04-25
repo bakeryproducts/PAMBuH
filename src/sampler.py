@@ -81,7 +81,9 @@ class BackgroundSampler:
                  max_trials: int = 25,
                  mask_glom_val: int = 255,
                  buffer_dist: int = 0,
-                 border_path=None) -> Tuple[np.ndarray, np.ndarray]:
+                 border_path=None,
+                 strict_mode=True
+                 ) -> Tuple[np.ndarray, np.ndarray]:
         """
            max_trials: max number of trials per one iteration
            step: num of glomeruli between iterations
@@ -104,6 +106,7 @@ class BackgroundSampler:
         self._count = -1
         self._step = step
         self._max_trials = max_trials
+        self._strict_mode = strict_mode
 
         # Get list of centroids
         self._centroids = [self.gen_backgr_pt() for _ in range(num_samples)]
@@ -134,10 +137,14 @@ class BackgroundSampler:
             sample_mask = self._mask.read(window=window, boundless=self._boundless)
             trial += 1 
 
-            if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
+            if self._strict_mode:
+                if np.sum(sample_mask) <= glom_presence_in_backgr * self._mask_glom_val:
+                    return x_cent, y_cent
+                elif trial == self._max_trials:
+                    trial, glom_presence_in_backgr = 0, glom_presence_in_backgr + self._step
+            else:
                 return x_cent, y_cent
-            elif trial == self._max_trials:
-                trial, glom_presence_in_backgr = 0, glom_presence_in_backgr + self._step
+
 
     def __iter__(self):
         return self

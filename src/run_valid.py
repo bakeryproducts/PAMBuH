@@ -32,7 +32,7 @@ def valid_dice(a,b, eps=1e-6):
     dice = ((2. * intersection + eps) / (a.sum() + b.sum() + eps)) 
     return dice
 
-def calc_all_dices(res_masks, thrs, use_torch):
+def calc_all_dices(res_masks, thrs, use_torch, logits):
     dices = {}
     for img_name, mask_name in res_masks.items():
         logger.log('DEBUG', f'Dice for {img_name}')
@@ -43,9 +43,9 @@ def calc_all_dices(res_masks, thrs, use_torch):
             import torch
             gt = torch.from_numpy(gt)
             mask = torch.from_numpy(mask).float()
-            mask.sigmoid_()
+            if logits: mask.sigmoid_()
         else:
-            mask = utils.sigmoid(mask)
+            if logits: mask = utils.sigmoid(mask)
 
         name = img_name.stem
 
@@ -110,7 +110,7 @@ def join_totals(model_folder):
     df = df.round(5)
     df.to_csv(f'{model_folder}/total_stats.csv')
 
-def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice):
+def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice, logits):
     os.makedirs(f'{model_folder}/predicts/masks', exist_ok=True)
     threshold = 0
     num_processes = len(gpus)
@@ -133,7 +133,7 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
     if do_dice:
         thrs = get_thrs()
-        dices = calc_all_dices(res_masks, thrs, use_torch=use_torch)
+        dices = calc_all_dices(res_masks, thrs, use_torch=use_torch, logits=logits)
         df_result = get_stats(dices, thrs).round(5)
         print(df_result)
         if timestamped:
@@ -156,21 +156,22 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_17_00_36_20_PAMBUH/')
+    model_folder = Path('output/2021_Apr_25_09_06_54/')
     FOLDS = [0,1,2,3] # or int 
     do_inf = False
-    do_dice = True
+    do_dice = not do_inf
     use_torch = not do_inf
     merge = False
-    gpus = [2,3]
-    #gpus = [0]
+    #gpus = [2,3]
+    gpus = [0,1]
+    LOGITS=False
 
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:
             fold_folder = model_folder / f'fold_{split_idx}' 
-            start_valid(fold_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice)
+            start_valid(fold_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice, LOGITS)
         join_totals(model_folder)
     else:
-        start_valid(model_folder, FOLDS, do_inf, merge, gpus, use_torch, do_dice)
+        start_valid(model_folder, FOLDS, do_inf, merge, gpus, use_torch, do_dice, LOGITS)
     
 

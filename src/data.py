@@ -176,7 +176,7 @@ class TagSegmentDataset:
                 ids.process_item = expander
                 mds.process_item = expander_float
             dataset = PairDataset(ids, mds)
-            dataset = TagDataset(dataset, self.img_domains[imgf.name])
+            dataset = TagDataset(dataset, self.img_domains.get(imgf.name, 0))
 
             if hard_mult and self.img_domains[imgf.name]: dataset = MultiplyDataset(dataset, hard_mult)
             if frozen:
@@ -209,45 +209,46 @@ def init_datasets(cfg):
     mult = cfg['TRAIN']['HARD_MULT']
     weights = cfg['TRAIN']['WEIGHTS']
 
-    AuxDataset = partial(SegmentDataset, hard_mult=mult)
-    AuxFrozenDataset = partial(SegmentDataset, hard_mult=mult, frozen=True)
-    #AuxDataset = partial(TagSegmentDataset, hard_mult=mult)
-    #AuxFrozenDataset = partial(TagSegmentDataset, hard_mult=mult, frozen=True)
-    AuxFPDataset = partial(SegmentDataset, hard_mult=4)
+    use_tag = False
+    D = SegmentDataset if not use_tag else TagSegmentDataset
+
+    AuxDataset = partial(D, hard_mult=mult)
+    AuxFrozenDataset = partial(D, hard_mult=mult, frozen=True)
+    AuxFPDataset = partial(D, hard_mult=10)
 
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
         "train1536full": AuxDataset(DATA_DIR/'CUTS/cuts1536x25'),
 
-        "train_0e": AuxDataset(DATA_DIR/'SPLITS/f_split/0e/train/'),
-        "val_0e": SegmentDataset(DATA_DIR/'SPLITS/f_split/0e/val/'),
+        #"train_0e": AuxDataset(DATA_DIR/'SPLITS/f_split/0e/train/'),
+        #"val_0e": SegmentDataset(DATA_DIR/'SPLITS/f_split/0e/val/'),
 
-        "train_2a": AuxDataset(DATA_DIR/'SPLITS/f_split/2a/train/'),
-        "val_2a": SegmentDataset(DATA_DIR/'SPLITS/f_split/2a/val/'),
+        #"train_2a": AuxDataset(DATA_DIR/'SPLITS/f_split/2a/train/'),
+        #"val_2a": SegmentDataset(DATA_DIR/'SPLITS/f_split/2a/val/'),
 
-        "train_18": AuxDataset(DATA_DIR/'SPLITS/f_split/18/train/'),
-        "val_18": SegmentDataset(DATA_DIR/'SPLITS/f_split/18/val/'),
+        #"train_18": AuxDataset(DATA_DIR/'SPLITS/f_split/18/train/'),
+        #"val_18": SegmentDataset(DATA_DIR/'SPLITS/f_split/18/val/'),
 
-        "train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/'),
-        "val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/'),
+        #"train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/'),
+        #"val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/'),
 
-        "random_0e": SegmentDataset(DATA_DIR/'backs/random_020_splits/0e/train/'),
-        "random_2a": SegmentDataset(DATA_DIR/'backs/random_020_splits/2a/train/'),
-        "random_18": SegmentDataset(DATA_DIR/'backs/random_020_splits/18/train/'),
-        "random_cc": SegmentDataset(DATA_DIR/'backs/random_020_splits/cc/train/'),
+        "random_0e": D(DATA_DIR/'backs/random_020_splits/0e/train/'),
+        "random_2a": D(DATA_DIR/'backs/random_020_splits/2a/train/'),
+        "random_18": D(DATA_DIR/'backs/random_020_splits/18/train/'),
+        "random_cc": D(DATA_DIR/'backs/random_020_splits/cc/train/'),
 
 
-        "sclero": SegmentDataset(DATA_DIR/'scleros_glomi/scle_cuts_1024/'), 
+        "sclero": D(DATA_DIR/'scleros_glomi/scle_cuts_1024/'), 
 
         "ssl_test": SslDS(DATA_DIR/'ssl/test/imgs'),
         "ssl_val": SslDS(DATA_DIR/'SPLITS/f_split/0e/val/imgs'),
 
-        "backs_cort": SegmentDataset(DATA_DIR/'backs/backs_x25_cortex/'),
-        "backs_cort_0e": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
-        "backs_cort_2a": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
-        "backs_cort_18": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
-        "backs_cort_cc": SegmentDataset(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
+        "backs_cort":    D(DATA_DIR/'backs/backs_x25_cortex/'),
+        "backs_cort_0e": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
+        "backs_cort_2a": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
+        "backs_cort_18": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
+        "backs_cort_cc": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
 
         "backs_fp_0e": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/0e/train/'),
         "backs_fp_2a": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/2a/train/'),
@@ -283,15 +284,15 @@ def init_datasets(cfg):
         "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
 
 
-        "random_0e_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/0e/train/'),
-        "random_2a_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/2a/train/'),
-        "random_18_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/18/train/'),
-        "random_cc_33": AuxDataset(DATA_DIR/'backs/random_150_splits_33_b/cc/train/'),
+        "random_0e_33": D(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
+        "random_2a_33": D(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),
+        "random_18_33": D(DATA_DIR/'backs/random_100_splits_33_b/18/train/'),
+        "random_cc_33": D(DATA_DIR/'backs/random_100_splits_33_b/cc/train/'),
 
-        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/0e/val/'),
-        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/2a/val/'),
-        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/18/val/'),
-        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_150_splits_33_b/cc/val/'),
+        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/val/'),
+        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/val/'),
+        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/18/val/'),
+        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/val/'),
 
 #_________________________
 #1

@@ -30,7 +30,7 @@ def clo(logits, targets, reduction='none'):
     #return  l2*w2
 
 def sbce(logits, targets, reduction='none'):
-    cr = smp.losses.SoftBCEWithLogitsLoss(smooth_factor=.1)
+    cr = smp.losses.SoftBCEWithLogitsLoss(smooth_factor=.05)
     return cr(logits, targets)
 
 def start(cfg, output_folder):
@@ -58,9 +58,9 @@ def start_fold(cfg, output_folder, datasets):
     model = wrap_ddp(cfg, model)
     opt = get_optim(cfg, model)
 
-    criterion = partial(clo, reduction=('none' if selective else 'mean'))
+    #criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = loss.focal_loss
-    #criterion = sbce
+    criterion = sbce
     #criterion = loss.symmetric_lovasz
     #criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
@@ -100,12 +100,12 @@ def start_fold(cfg, output_folder, datasets):
     l5, l6 = l0, l1 * 1
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.1, sh.schedulers.sched_cos(l0,l1)],
+        [.3, sh.schedulers.sched_cos(l0,l1)],
         #[.1, sh.schedulers.sched_cos(l1,l3)],
         #[.1, sh.schedulers.sched_cos(l3,l4)],
         #[.1, sh.schedulers.sched_cos(l4,l5)],
         #[.1, SH.SCHEDULERS.SCHED_COS(L5,L6)],
-        [.9, sh.schedulers.sched_cos(l1,l2)],
+        [.7, sh.schedulers.sched_cos(l1,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
 

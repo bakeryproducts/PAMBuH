@@ -3,8 +3,11 @@ OUTPUTS: output
 
 DATA:
   TRAIN:
-    DATASETS: ['backs_cort_0e', 'random_0e_33']
-    #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', ] #'backs_cort_0e', 'backs_fp_0e']
+    #DATASETS: ['backs_cort_0e', 'random_0e_33']
+    DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e']
+    #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_fp_0e']
+    #DATASETS: ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18']
+    #DATASETS: ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']
     #FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e'],
     #        ['train_2a_33_frozen', 'train_2a_33_soft', 'random_2a_33', 'backs_cort_2a', 'backs_fp_2a'],
     #        ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18'],
@@ -15,6 +18,8 @@ DATA:
     MULTIPLY: {'rate':1}
   VALID:
     DATASETS: ['val_0e_33', 'random_0e_33_val']
+    #DATASETS: ['val_18_33', 'random_18_33_val']
+    #DATASETS: ['val_cc_33', 'random_cc_33_val']
     #FOLDS: [['val_0e_33', 'random_0e_33_val'],
     #        ['val_2a_33', 'random_2a_33_val'],
     #        ['val_18_33', 'random_18_33_val'],
@@ -38,7 +43,7 @@ TRANSFORMERS:
     AUG: 'test'
   CROP: [256,256]
   #CROP: [256,256]
-  RESIZE: [256,256]
+  RESIZE: [512,512]
   MEAN:
   - 0.6226
   - 0.4284
@@ -49,24 +54,24 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00002, 0.0002, 0.00002, 2]
+  LRS: [0.00001, 0.0005, 0.00001, 2]
   DOWNSCALE: 3
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   HARD_MULT: 2
   EMA: 0.995
   #WEIGHTS: 'input/scores_color_train.pkl'
-  #INIT_MODEL: 'output/2021_Apr_16_13_26_27_PAMBUH/models/'
+  #INIT_MODEL: 'output/2021_Apr_21_17_50_34_PAMBUH/models/'
   AMP: True
   GPUS: [0,1,2,3]
-  NUM_WORKERS: 8
+  NUM_WORKERS: 4
   
-  SAVE_STEP: .95
+  SAVE_STEP: 1.
   SCALAR_STEP: 1
   TB_STEP: 4
   
   EPOCH_COUNT: 100
-  BATCH_SIZE: 16
+  BATCH_SIZE: 64
 VALID:
   STEP: 4
   BATCH_SIZE: 32

@@ -185,6 +185,8 @@ class TBPredictionsCB(sh.callbacks.Callback):
 class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
+        self.cl_criterion = partial(torch.nn.functional.binary_cross_entropy_with_logits, reduction='none')
+        #self.cl_criterion = smp.losses.SoftBCEWithLogitsLoss(reduction='none')
         self.cll = []
 
     @sh.utils.on_train
@@ -204,6 +206,21 @@ class TrainCB(sh.callbacks.Callback):
         #    print('f1: ', loss.f1_loss(a,b))
         #self.cll = []
     
+    #def class_loss(self, xb, yb, tag, preds, aux_cl_pred):
+    #    cl_pred = aux_cl_pred[:,0] # [BS, NUM_CLASSES]
+
+    #    with torch.no_grad():
+    #        # ffpe classes
+    #        cl_ffpe_gt = tag.float() # tag 0,1
+    #        # backgrounds
+    #        #cl_bg_gt = yb.sum(axis=(1,2,3)) > 256*256/100 # 1% , 0;1
+    #        #cl_gt = 2**0 * cl_ffpe_gt + 2 ** 1 * (2+cl_bg_gt)
+    #        #cl_gt = cl_gt - 4
+    #        #cl_gt = torch.nn.functional.one_hot(cl_gt)
+
+    #    cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b)
+    #    self.cll.append(cl_loss.detach().item())
+
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
         tag = get_tag(self.batch) 
@@ -222,16 +239,20 @@ class TrainCB(sh.callbacks.Callback):
             #print(loss.item(), cl_loss.mean().item(), cl_loss)
             loss = loss  + 10 * cl_loss.mean()
 
-        #if tag is not None:
         if False:
+        #if tag is not None:
             #print(tag.shape, tag.dtype, aux_cl_pred.shape, aux_cl_pred.dtype)
             cl_mask = yb.sum(axis=(1,2,3)) > 0
+            a,b = aux_cl_pred[:,0], tag.float()
+            cl_loss = self.cl_criterion(a,b)
+            cl_loss[cl_mask] = 0
+            cl_loss = cl_loss.mean()
+            self.cll.append(cl_loss.item())
+            self.cl_gt.append(b.detach())
+            self.cl_pred.append(a.detach().sigmoid())
             #print(cl_mask)
-            a,b = aux_cl_pred[:,0][cl_mask], tag.float()[cl_mask]
-            cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b)
-            self.cll.append(cl_loss.detach().item())
             #print(cl_loss)
-            loss = loss * .5 + .5 * cl_loss
+            loss = loss + cl_loss/100
 
         self.learner.loss = loss
 
@@ -355,7 +376,6 @@ class ValCB(sh.callbacks.Callback):
     def val_step(self):
         xb, yb = get_xb_yb(self.batch)
         with torch.no_grad():
-            #with torch.cuda.amp.autocast():
             self.learner.preds, _ = get_pred(self.model, xb)
             self.learner.loss = self.loss_func(self.preds, yb)
                 

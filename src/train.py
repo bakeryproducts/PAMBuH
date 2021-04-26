@@ -60,9 +60,9 @@ def start_fold(cfg, output_folder, datasets):
 
     #criterion = partial(clo, reduction=('none' if selective else 'mean'))
     #criterion = loss.focal_loss
-    criterion = sbce
+    #criterion = sbce
     #criterion = loss.symmetric_lovasz
-    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
+    criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) 
@@ -100,12 +100,12 @@ def start_fold(cfg, output_folder, datasets):
     l5, l6 = l0, l1 * 1
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.3, sh.schedulers.sched_cos(l0,l1)],
-        #[.1, sh.schedulers.sched_cos(l1,l3)],
-        #[.1, sh.schedulers.sched_cos(l3,l4)],
+        [.1, sh.schedulers.sched_cos(l0,l1)],
+        [.1, sh.schedulers.sched_cos(l1,l3)],
+        [.1, sh.schedulers.sched_cos(l3,l4)],
         #[.1, sh.schedulers.sched_cos(l4,l5)],
         #[.1, SH.SCHEDULERS.SCHED_COS(L5,L6)],
-        [.7, sh.schedulers.sched_cos(l1,l2)],
+        [.7, sh.schedulers.sched_cos(l4,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
 

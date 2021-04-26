@@ -113,8 +113,8 @@ def get_optim(cfg, model):
     #opt = optim.SGD
     #opt_kwargs = {'momentum':.9}
     opt = optim.AdamW
-    #opt_kwargs = {'amsgrad':True, 'weight_decay':2e-2}
-    opt_kwargs = {}
+    opt_kwargs = {'amsgrad':True, 'weight_decay':1e-3}
+    #opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
 
     return optimizer

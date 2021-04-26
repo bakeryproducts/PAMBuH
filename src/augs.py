@@ -99,8 +99,8 @@ class Augmentator:
                                                     ])
 
     def custom_augs(self, p): return albu.OneOf([
-                    self.Alights(p=.3),
-                    self.FakeGlo(p=.1),
+                    #self.Alights(p=.3),
+                    #self.FakeGlo(p=.1),
                     AddGammaCorrection(p=.3),
         ], p=p)
 

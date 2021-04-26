@@ -228,6 +228,46 @@ class PolySampler:
     def __len__(self): return self._num_samples
     def __del__(self): del self._img
 
+class GridSampler:
+
+    def __init__(self,
+                 img_path: str,
+                 mask_path: str,
+                 img_wh: Tuple[int, int],
+                 ) -> Tuple[np.ndarray, np.ndarray]:
+
+        self._mask = TFReader(mask_path)
+        self._img = TFReader(img_path)
+        self._w, self._h = img_wh
+        self._boundless = True
+        self._count = -1
+
+        _, dims, *_  = get_basics_rasterio(img_path)
+        self.block_cds = list(generate_block_coords(dims[0], dims[1], img_wh))
+        self._num_samples = len(self.block_cds)
+
+    def __iter__(self): return self
+    def __len__(self): return self._num_samples
+
+    def __next__(self):
+        self._count += 1
+        if self._count < self._num_samples:
+            return self.__getitem__(self._count)
+        else:
+            self._count = -1
+            raise StopIteration("Failed to proceed to the next step")
+
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+
+        y_off, x_off, _, _ = self.block_cds[idx]
+        window = Window(x_off, y_off, self._w, self._h)
+        img = self._img.read(window=window, boundless=self._boundless)
+        mask = self._mask.read(window=window, boundless=self._boundless)
+        return img, mask
+
+    def __del__(self):
+        del self._mask
+        del self._img
 
 
 def _write_block(block, name):
@@ -259,6 +299,7 @@ def tif_block_read(name, block_size=None):
     del input_file
 
 
+
 def _count_blocks(name, block_size=(256, 256)):
     # find total x and y blocks to be read
     _, dims, *_  = get_basics_rasterio(name)
@@ -266,4 +307,14 @@ def _count_blocks(name, block_size=(256, 256)):
     nYBlocks = (int)((dims[1] + block_size[1] - 1) / block_size[1])
     return nXBlocks, nYBlocks
 
+def generate_block_coords(H, W, block_size):
+    h,w = block_size
+    nYBlocks = (int)((H + h - 1) / h)
+    nXBlocks = (int)((W + w - 1) / w)
+    
+    for X in range(nXBlocks):
+        cx = X * h
+        for Y in range(nYBlocks):
+            cy = Y * w
+            yield cy, cx, h, w
 

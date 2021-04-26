@@ -4,26 +4,26 @@ OUTPUTS: output
 DATA:
   TRAIN:
     #DATASETS: ['backs_cort_0e', 'random_0e_33']
-    DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e']
+    #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'grid_0e_33']
     #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_fp_0e']
     #DATASETS: ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18']
     #DATASETS: ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']
-    #FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_cort_0e', 'backs_fp_0e'],
-    #        ['train_2a_33_frozen', 'train_2a_33_soft', 'random_2a_33', 'backs_cort_2a', 'backs_fp_2a'],
-    #        ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18'],
-    #        ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']]
+    FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'grid_0e_33'],
+            ['train_2a_33_frozen', 'train_2a_33_soft', 'grid_2a_33'],
+            ['train_18_33_frozen', 'train_18_33_soft', 'grid_18_33'],
+            ['train_cc_33_frozen', 'train_cc_33_soft', 'grid_cc_33']]
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
     MULTIPLY: {'rate':1}
   VALID:
-    DATASETS: ['val_0e_33', 'random_0e_33_val']
+    #DATASETS: ['val_0e_33']
     #DATASETS: ['val_18_33', 'random_18_33_val']
     #DATASETS: ['val_cc_33', 'random_cc_33_val']
-    #FOLDS: [['val_0e_33', 'random_0e_33_val'],
-    #        ['val_2a_33', 'random_2a_33_val'],
-    #        ['val_18_33', 'random_18_33_val'],
-    #        ['val_cc_33', 'random_cc_33_val']]
+    FOLDS: [['val_0e_33' ],
+            ['val_2a_33' ],
+            ['val_18_33' ],
+            ['val_cc_33' ]]
     PRELOAD: False
   SSL:
     DATASETS: ['ssl_test', 'ssl_val']
@@ -41,7 +41,7 @@ TRANSFORMERS:
     AUG: 'ssl'
   TEST:
     AUG: 'test'
-  CROP: [256,256]
+  CROP: [512,512]
   #CROP: [256,256]
   RESIZE: [512,512]
   MEAN:
@@ -56,10 +56,10 @@ TRANSFORMERS:
 TRAIN:
   LRS: [0.00001, 0.0005, 0.00001, 2]
   DOWNSCALE: 3
-  NUM_FOLDS: 1
+  NUM_FOLDS: 4
   SELECTIVE_BP: 1.
-  HARD_MULT: 2
-  EMA: 0.995
+  HARD_MULT: 1
+  EMA: 0.9995
   #WEIGHTS: 'input/scores_color_train.pkl'
   #INIT_MODEL: 'output/2021_Apr_21_17_50_34_PAMBUH/models/'
   AMP: True
@@ -71,7 +71,7 @@ TRAIN:
   TB_STEP: 4
   
   EPOCH_COUNT: 100
-  BATCH_SIZE: 64
+  BATCH_SIZE: 16
 VALID:
   STEP: 4
   BATCH_SIZE: 32

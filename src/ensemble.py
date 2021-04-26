@@ -51,6 +51,7 @@ if __name__ == '__main__':
             Path('output/2021_Apr_24_12_05_27_PAMBUH/'),
             Path('output/2021_Apr_24_00_57_16_PAMBUH/'),
             Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
+            Path('output/2021_Apr_26_08_32_37_PAMBUH/'),
             ]
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     dst_path = Path(f'output/{timestamp}')

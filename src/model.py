@@ -71,7 +71,16 @@ def model_select():
     #model = partial(smp.Unet, encoder_name='resnet18')
     #model = partial(smp.Unet)
 
-    #model = partial(smp.Unet, encoder_name='timm-regnetx_032')
+
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032', aux_params={'classes':1, 'activation':None, 'dropout':0}) 
+
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032') 
+    model = partial(smp.Unet, encoder_name='timm-regnety_032')
+
+    #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnety_008')
+
+    
+    #model = partial(smp.Linknet, encoder_name='timm-regnety_016')
     #model = partial(smp.Unet, encoder_name='se_resnet50')
     #model = partial(smp.Unet)
     #model = partial(smp.Unet, encoder_name='resnet34', decoder_use_batchnorm=True)
@@ -79,7 +88,7 @@ def model_select():
     #model = partial(smp.manet.MAnet, encoder_weights='ssl', encoder_name='resnext101_32x4d')
     #model = partial(smp.manet.MAnet, encoder_name='timm-regnetx_016')
     #model = partial(smp.manet.MAnet,  encoder_weights=None)
-    model = partial(smp.manet.MAnet)
+    #model = partial(smp.manet.MAnet)
 
     #model = smp.DeepLabV3Plus
     #model = partial(smp.DeepLabV3Plus, encoder_name='timm-regnetx_032')
@@ -101,8 +110,13 @@ def get_optim(cfg, model):
     base_lr = 1e-4# should be overriden in LR scheduler anyway
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
+    #opt = optim.Adam
+    #opt_kwargs = {'amsgrad':True}
+    #opt = optim.SGD
+    #opt_kwargs = {'momentum':.9}
     opt = optim.AdamW
-    opt_kwargs = {}
+    opt_kwargs = {'amsgrad':True, 'weight_decay':1e-3}
+    #opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
 
     return optimizer

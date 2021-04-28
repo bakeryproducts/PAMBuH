@@ -43,9 +43,6 @@ def calc_all_dices(res_masks, thrs, use_torch):
             import torch
             gt = torch.from_numpy(gt)
             mask = torch.from_numpy(mask).float()
-            mask.sigmoid_()
-        else:
-            mask = utils.sigmoid(mask)
 
         name = img_name.stem
 
@@ -156,14 +153,14 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_17_00_36_20_PAMBUH/')
+    model_folder = Path('output/2021_Apr_27_23_59_08_PAMBUH/')
     FOLDS = [0,1,2,3] # or int 
     do_inf = False
-    do_dice = True
+    do_dice = not do_inf
     use_torch = not do_inf
     merge = False
-    gpus = [2,3]
-    #gpus = [0]
+    #gpus = [2,3]
+    gpus = [0,1]
 
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:

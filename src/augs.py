@@ -4,7 +4,7 @@ import torch  # to tensor transform
 import albumentations as albu
 import albumentations.pytorch as albu_pt
 
-from _add_augs import AddLightning, AddFakeGlom
+from _add_augs import AddLightning, AddFakeGlom, AddGammaCorrection
 
 
 class ToTensor(albu_pt.ToTensorV2):
@@ -22,8 +22,8 @@ class Augmentator:
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
-        self.Alights = partial(AddLightning, imgs_path='input/aug_data/light/') # cfg is partial! there is no cfg.INPUTS here
-        self.FakeGlo = partial(AddFakeGlom, masks_path='input/CUTS/cuts_B_1536x33/masks/') # cfg is partial! there is no cfg.INPUTS here
+        self.Alights = partial(AddLightning, imgs_path='input/aug_data/light/', crop_w=self.crop_w) # cfg is partial! there is no cfg.INPUTS here
+        self.FakeGlo = partial(AddFakeGlom, masks_path='input/CUTS/cuts_B_1536x33/masks/', crop_w=self.crop_w) # cfg is partial! there is no cfg.INPUTS here
 
 
     def get_aug(self, kind):
@@ -98,15 +98,20 @@ class Augmentator:
                                                     self.norm()
                                                     ])
 
+    def custom_augs(self, p): return albu.OneOf([
+                    #self.Alights(p=.3),
+                    #self.FakeGlo(p=.1),
+                    AddGammaCorrection(p=.3),
+        ], p=p)
+
     def additional_res(self):
         return self.compose([
                     self.scale(p=.2),
-                    self.FakeGlo(p=.2),
-                    self.Alights(p=.3),
-                    self.color_jit(p=.3),
+                    self.custom_augs(p=.2),
+                    self.color_jit(p=.2),
                     self.cutout(p=.2),
                     self.blur(p=.2),
-            ], p=.4)
+            ], p=.5)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
@@ -114,8 +119,6 @@ class Augmentator:
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])
     def aug_test(self): return self.compose([self.resize(), self.norm()])
-
-    def share_some_light(self): return self.Lightniner()
 
 
 def get_aug(aug_type, transforms_cfg, tag=False):

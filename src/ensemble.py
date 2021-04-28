@@ -10,6 +10,8 @@ from functools import partial
 import numpy as np
 from tqdm import tqdm
 
+import utils
+
 
 def ensemble_predictions(folders, dst_path):
     mask_names = (folders[0]/'predicts/raw').glob('*.npy')
@@ -40,12 +42,17 @@ def ensemble_folds(folders, dst_path):
         ensemble_predictions(fold_folders, dst_folder_path)
 
     
-
 if __name__ == '__main__':
-    FOLDS = False
+    FOLDS = True
     folders = [
-            Path('output/2021_Apr_16_13_26_27_PAMBUH/'),
-            Path('output/2021_Apr_16_10_14_06_PAMBUH/'),
+            Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
+            Path('output/2021_Apr_26_20_11_10_PAMBUH/'),
+            Path('output/2021_Apr_26_08_32_37_PAMBUH/'),
+            Path('output/2021_Apr_24_12_05_27_PAMBUH/'),
+            #Path('output/2021_Apr_24_12_05_27_PAMBUH/'),
+            #Path('output/2021_Apr_24_00_57_16_PAMBUH/'),
+            #Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
+            #Path('output/2021_Apr_26_08_32_37_PAMBUH/'),
             ]
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     dst_path = Path(f'output/{timestamp}')

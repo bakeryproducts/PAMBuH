@@ -73,8 +73,10 @@ def model_select():
 
 
     #model = partial(smp.Unet, encoder_name='timm-regnetx_032', aux_params={'classes':1, 'activation':None, 'dropout':0}) 
-    model = partial(smp.Unet, encoder_name='timm-regnetx_032') 
-    #model = partial(smp.Unet, encoder_name='timm-regnety_016')
+
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032') 
+    model = partial(smp.Unet, encoder_name='timm-regnety_032')
+
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnety_008')
 
     

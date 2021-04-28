@@ -16,7 +16,7 @@ import rle2tiff
 
 
 
-def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, threshold=.5, save_predicts=False, to_rle=False):
+def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, thresholds, save_predicts=False, to_rle=False):
     logger.log('DEBUG', '\n'.join(list([str(i) for i in img_names])))
 
     m = mp.Manager()
@@ -47,18 +47,33 @@ def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, thresho
             logger.log('DEBUG', f'{img_name} done')
             if to_rle:
                 logger.log('DEBUG', f'RLE...')
+                threshold = thresholds[0]
                 mask = (mask > threshold).astype(np.uint8)
                 rle = rle2tiff.mask2rle(mask)
                 result_masks[img_name] = rle
 
     return result_masks 
 
+def read_results(model_folder, img_names, thresholds):
+    mask_names = [model_folder / 'predicts/raw' / m.with_suffix('.npy').name for m in img_names]
+    result_masks = {k:v for k,v in zip(img_names, mask_names)}
+
+    for img_name, mask_path in result_masks.items():
+        mask = np.load(mask_path)[0]
+        logger.log('DEBUG', f'{img_name} done')
+        logger.log('DEBUG', f'RLE...')
+        threshold = thresholds[0]
+        mask = (mask > threshold).astype(np.uint8)
+        rle = rle2tiff.mask2rle(mask)
+        result_masks[img_name] = rle
+
+    return result_masks
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_12_19_28_51_PAMBUH/')
+    model_folder = Path('output/2021_Apr_27_13_28_07/')
     gpu_list = [0,1,2,3]
-    threshold = .5
+    thresholds = [.5]#[.55, .5, .48, .47]
     num_processes = len(gpu_list)
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))
@@ -68,12 +83,16 @@ if __name__ == '__main__':
     use_tta = True
     save_predicts = True
     to_rle = True
+    do_inf = False
 
-    results = start_inf(model_folder, 
-                        img_names, 
-                        gpu_list, 
-                        num_processes, 
-                        use_tta, 
-                        threshold=threshold, save_predicts=save_predicts, to_rle=to_rle)
+    if do_inf:
+        results = start_inf(model_folder, 
+                            img_names, 
+                            gpu_list, 
+                            num_processes, 
+                            use_tta, 
+                            thresholds=thresholds, save_predicts=save_predicts, to_rle=to_rle)
+    else:
+        results = read_results(model_folder, img_names, thresholds)
 
-    if to_rle: dump_to_csv(results, model_folder, threshold)
+    if to_rle: dump_to_csv(results, model_folder, thresholds[0])

@@ -160,6 +160,7 @@ class MegaModel(torch.nn.Module):
     def __init__(self, root):
         self.averaging = 'mean'
         self._model_folders = list(Path(root).glob()) # root / model1 ; model2; model3; ...
+        # TODO : SORT THEM
         self._model_types = [
                 smp.Unet(encoder_name='timm-regnety_016'), # model1
                 smp.Unet(encoder_name='timm-regnetx_032'), # model2
@@ -219,13 +220,5 @@ class MegaModel(torch.nn.Module):
 
         res = torch.stack(preds).mean(0) # TODO : mean(0)? do right thing 
         return  res
-
- 
-
-
-
-
-
-
 
 

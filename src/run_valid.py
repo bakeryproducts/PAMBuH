@@ -41,6 +41,7 @@ def calc_all_dices(res_masks, thrs, use_torch):
 
         if use_torch:
             import torch
+            os.environ['CUDA_VISIBLE_DEVICES'] = '3'
             gt = torch.from_numpy(gt)
             mask = torch.from_numpy(mask).float()
 
@@ -153,13 +154,13 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_27_23_59_08_PAMBUH/')
-    FOLDS = [0,1,2,3] # or int 
+    model_folder = Path('output/2021_May_01_14_12_26_PAMBUH/')
+    FOLDS = 0#[0,1,2,3] # or int 
     do_inf = False
     do_dice = not do_inf
     use_torch = not do_inf
     merge = False
-    #gpus = [2,3]
+    #gpus = [1,2]
     gpus = [0,1]
 
     if isinstance(FOLDS, list):

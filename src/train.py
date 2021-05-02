@@ -59,11 +59,9 @@ def start_fold(cfg, output_folder, datasets):
     opt = get_optim(cfg, model)
 
     #criterion = partial(clo, reduction=('none' if selective else 'mean'))
-    #criterion = loss.focal_loss
     #criterion = sbce
     #criterion = loss.symmetric_lovasz
     criterion = torch.nn.functional.binary_cross_entropy_with_logits
-    #criterion = partial(lovedge, edgeloss=loss.EdgeLoss(mode='edge'))
 
     train_cb = TrainCB(logger=logger) 
     #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 
@@ -92,24 +90,20 @@ def start_fold(cfg, output_folder, datasets):
         train_timer_cb = sh.callbacks.TimerCB(mode_train=True, logger=logger)
         master_cbs = [train_timer_cb, *tb_cbs, checkpoint_cb]
     
-    #l0,l1,l2 = 5e-5, 2e-4, 3e-5
-    #scale = 1/2 
     l0,l1,l2, scale = cfg.TRAIN.LRS
     l0,l1,l2 = l0 * scale, l1 * scale, l2 * scale # scale if for DDP , cfg.PARALLEL.WORLD_SIZE
-    l3, l4 = l0, l1 * 1
+    l3, l4 = l0, l1 * .3
     l5, l6 = l0, l1 * 1
 
     lr_cos_sched = sh.schedulers.combine_scheds([
-        [.1, sh.schedulers.sched_cos(l0,l1)],
-        [.1, sh.schedulers.sched_cos(l1,l3)],
-        [.1, sh.schedulers.sched_cos(l3,l4)],
+        [.2, sh.schedulers.sched_cos(l0,l1)],
+        #[.1, sh.schedulers.sched_cos(l1,l3)],
+        #[.1, sh.schedulers.sched_cos(l3,l4)],
         #[.1, sh.schedulers.sched_cos(l4,l5)],
-        #[.1, SH.SCHEDULERS.SCHED_COS(L5,L6)],
-        [.7, sh.schedulers.sched_cos(l4,l2)],
+        [.8, sh.schedulers.sched_cos(l1,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
 
-    #early_stop = EarlyStop(5, logger=logger) TODO DDP
     cbs = [CudaCB(), train_cb, val_cb, lrcb]
         
     if cfg.PARALLEL.IS_MASTER:

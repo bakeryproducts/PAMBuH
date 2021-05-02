@@ -110,37 +110,23 @@ class TBMetricCB(TrackResultsCB):
         self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
+        if self.valid_dice > self.max_dice:
+            self.max_dice = self.valid_dice
+            if self.max_dice > .91:
+                chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
+                if chpt_cb is not None: chpt_cb.do_saving(f'cmax_val_{round(self.max_dice, 4)}', save_ema=False)
+
         if self.valid_dice2 > self.max_dice:
             self.max_dice = self.valid_dice2
             if self.max_dice > .91:
                 chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
-                if chpt_cb is not None: chpt_cb.do_saving(f'cmax_{round(self.max_dice, 4)}')
+                if chpt_cb is not None: chpt_cb.do_saving(f'cmax_ema_{round(self.max_dice, 4)}', save_ema=True)
             
     def after_epoch(self):
         if self.model.training: self.after_epoch_train()
         else: self.after_epoch_valid()
         self.writer.flush()
 
-class EarlyStop(sh.callbacks.Callback):
-    def __init__(self, num=5, logger=None):
-        sh.utils.store_attr(self, locals())
-        self.best = 0
-        self.cnt = 0
-
-    @sh.utils.on_validation
-    def after_epoch(self):
-        cb = get_cb_by_instance(self.cbs, TBMetricCB)
-        if cb is None: return 
-        best = cb.max_dice
-        if best > self.best:
-            self.best = best
-            self.cnt = 0
-        else:
-            self.cnt += 1
-            if self.cnt >= self.num:
-                self.log_debug(f'EARLY STOP, {self.best}')
-                #torch.distributed.destroy_process_group() # ugly way , should use allreduce
-                raise sh.learner.CancelFitException 
         
 class TBPredictionsCB(sh.callbacks.Callback):
     def __init__(self, writer, logger=None, step=1):
@@ -200,26 +186,6 @@ class TrainCB(sh.callbacks.Callback):
     @sh.utils.on_train
     def after_epoch(self):
         pass
-        #print(np.mean(self.cll))
-        #with torch.no_grad():
-        #    a, b = torch.cat(self.cl_gt), torch.cat(self.cl_pred)
-        #    print('f1: ', loss.f1_loss(a,b))
-        #self.cll = []
-    
-    #def class_loss(self, xb, yb, tag, preds, aux_cl_pred):
-    #    cl_pred = aux_cl_pred[:,0] # [BS, NUM_CLASSES]
-
-    #    with torch.no_grad():
-    #        # ffpe classes
-    #        cl_ffpe_gt = tag.float() # tag 0,1
-    #        # backgrounds
-    #        #cl_bg_gt = yb.sum(axis=(1,2,3)) > 256*256/100 # 1% , 0;1
-    #        #cl_gt = 2**0 * cl_ffpe_gt + 2 ** 1 * (2+cl_bg_gt)
-    #        #cl_gt = cl_gt - 4
-    #        #cl_gt = torch.nn.functional.one_hot(cl_gt)
-
-    #    cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b)
-    #    self.cll.append(cl_loss.detach().item())
 
     def train_step(self):
         xb, yb = get_xb_yb(self.batch)
@@ -227,35 +193,7 @@ class TrainCB(sh.callbacks.Callback):
         self.learner.preds, aux_cl_pred = get_pred(self.model, xb)
         loss = self.loss_func(self.preds, yb)
 
-        if False:
-            a = aux_cl_pred[:,0]
-            b = yb.sum(axis=(1,2,3)) > 256*256/100 # 1%
-            self.cl_gt.append(b.float().detach())
-            t = a.detach().sigmoid()>.5
-            self.cl_pred.append(t.float())
-            #print(a.shape, a.dtype, b.shape, b.dtype)
-            cl_loss = torch.nn.functional.binary_cross_entropy_with_logits(a,b.float(), reduce=False) 
-            #cl_loss[b] = 0
-            #print(loss.item(), cl_loss.mean().item(), cl_loss)
-            loss = loss  + 10 * cl_loss.mean()
-
-        if False:
-        #if tag is not None:
-            #print(tag.shape, tag.dtype, aux_cl_pred.shape, aux_cl_pred.dtype)
-            cl_mask = yb.sum(axis=(1,2,3)) > 0
-            a,b = aux_cl_pred[:,0], tag.float()
-            cl_loss = self.cl_criterion(a,b)
-            cl_loss[cl_mask] = 0
-            cl_loss = cl_loss.mean()
-            self.cll.append(cl_loss.item())
-            self.cl_gt.append(b.detach())
-            self.cl_pred.append(a.detach().sigmoid())
-            #print(cl_mask)
-            #print(cl_loss)
-            loss = loss + cl_loss/100
-
         self.learner.loss = loss
-
         #torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
         self.learner.loss.backward()
         self.learner.opt.step()
@@ -368,8 +306,6 @@ class ValCB(sh.callbacks.Callback):
             p = torch.sigmoid(preds.cpu().float())
             p = (p>.5).float()
             dice = loss.dice_loss(p, yb.cpu().float())
-            #dice = loss.dice_loss(torch.sigmoid(preds.cpu().float()), yb.cpu().float())
-            #print(n, dice, dice*n)
             self.learner.extra_accs.append(dice * batch_size)
             self.learner.extra_samples_count.append(batch_size)
 
@@ -433,15 +369,14 @@ class CheckpointCB(sh.callbacks.Callback):
         sh.utils.store_attr(self, locals())
         self.pct_counter = None if isinstance(self.save_step, int) else self.save_step
         
-    def do_saving(self, val=''):
-        state_dict = get_state_dict(self.model) if not self.ema else get_state_dict(self.model_ema)
-        postfix = 'ema_' if self.ema else ''
+    def do_saving(self, val='', save_ema=True):
+        state_dict =  get_state_dict(self.model_ema) if save_ema else get_state_dict(self.model)
         torch.save({
                 'epoch': self.n_epoch,
                 'loss': self.loss,
                 'model_state': state_dict,
                 'opt_state':self.opt.state_dict(), 
-            }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{postfix}{val}.pth'))
+            }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{val}.pth'))
 
     def after_epoch(self):
         save = False

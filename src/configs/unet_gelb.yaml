@@ -5,25 +5,32 @@ DATA:
   TRAIN:
     #DATASETS: ['backs_cort_0e', 'random_0e_33']
     #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'grid_0e_33']
+    #DATASETS: ['grid_0e_33']
+    #DATASETS: ['train_0e_50_soft', 'train_0e_50_frozen', 'grid_0e_50']
     #DATASETS: ['train_0e_33_frozen', 'train_0e_33_soft', 'random_0e_33', 'backs_fp_0e']
     #DATASETS: ['train_18_33_frozen', 'train_18_33_soft', 'random_18_33', 'backs_cort_18', 'backs_fp_18']
     #DATASETS: ['train_cc_33_frozen', 'train_cc_33_soft', 'random_cc_33', 'backs_cort_cc', 'backs_fp_cc']
-    FOLDS: [['train_0e_33_frozen', 'train_0e_33_soft', 'grid_0e_33'],
-            ['train_2a_33_frozen', 'train_2a_33_soft', 'grid_2a_33'],
-            ['train_18_33_frozen', 'train_18_33_soft', 'grid_18_33'],
-            ['train_cc_33_frozen', 'train_cc_33_soft', 'grid_cc_33']]
+    FOLDS: [['train_0e_50_frozen', 'train_0e_50_soft', 'grid_0e_50'],
+            ['train_2a_50_frozen', 'train_2a_50_soft', 'grid_2a_50'],
+            ['train_18_50_frozen', 'train_18_50_soft', 'grid_18_50'],
+            ['train_cc_50_frozen', 'train_cc_50_soft', 'grid_cc_50']]
+    #FOLDS: [['grid_0e_50'],
+    #        ['grid_2a_50'],
+    #        ['grid_18_50'],
+    #        ['grid_cc_50']]
     GPU_PRELOAD: False
     PRELOAD: False
     CACHE: False
     MULTIPLY: {'rate':1}
   VALID:
     #DATASETS: ['val_0e_33']
+    #DATASETS: ['val_0e_50']
     #DATASETS: ['val_18_33', 'random_18_33_val']
     #DATASETS: ['val_cc_33', 'random_cc_33_val']
-    FOLDS: [['val_0e_33' ],
-            ['val_2a_33' ],
-            ['val_18_33' ],
-            ['val_cc_33' ]]
+    FOLDS: [['val_0e_50' ],
+            ['val_2a_50' ],
+            ['val_18_50' ],
+            ['val_cc_50' ]]
     PRELOAD: False
   SSL:
     DATASETS: ['ssl_test', 'ssl_val']
@@ -41,9 +48,9 @@ TRANSFORMERS:
     AUG: 'ssl'
   TEST:
     AUG: 'test'
-  CROP: [512,512]
   #CROP: [256,256]
-  RESIZE: [512,512]
+  CROP: [1024,1024]
+  RESIZE: [256,256]
   MEAN:
   - 0.6226
   - 0.4284
@@ -54,8 +61,8 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00001, 0.0004, 0.00001, 2]
-  DOWNSCALE: 3
+  LRS: [0.00001, 0.0005, 0.00001, 1]
+  DOWNSCALE: 2
   NUM_FOLDS: 4
   SELECTIVE_BP: 1.
   HARD_MULT: 1
@@ -70,11 +77,11 @@ TRAIN:
   SCALAR_STEP: 1
   TB_STEP: 4
   
-  EPOCH_COUNT: 100
-  BATCH_SIZE: 16
+  EPOCH_COUNT: 80
+  BATCH_SIZE: 8
 VALID:
   STEP: 4
-  BATCH_SIZE: 32
+  BATCH_SIZE: 8
 SSL:
   STEP: 1
   BATCH_SIZE: 64

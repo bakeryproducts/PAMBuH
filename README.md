@@ -80,37 +80,11 @@ Data structure:
     writer on main process checks Queue for tiles, loads them into batch, rest is in sync with SP pipeline
 
 
-2. AUGs
-
-3. 
-
-
-
-5. COde based:
-    - scale problem , .65/.5
-    - 512?
-    - exclude afa from valid total?
-    - multiply hard even more
-    - Smooth pseudo label, mix with hard
+1. COde based:
     - threshold ? Multifold??
     - pseudo on test
-    - aug even harder for ssl
-    - clean images research
-    - tricky image research
-    - aux classifier
     - mix of fold models
     - optimizerS schedule
-    - join predicts on logits
-    - 
-
-
-6. pip package?
-
-
-
-Papers:
-Unet, resnet
-- https://arxiv.org/pdf/2001.05548v1.pdf
-- https://arxiv.org/pdf/1804.03999.pdf
-- https://arxiv.org/pdf/1903.02740v1.pdf
+    - SiLU
+    - rg32
 

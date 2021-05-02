@@ -19,8 +19,6 @@ import utils
 import augs
 from _data import *
 from sampler import GdalSampler
-from nn_sampler import SelectiveSampler, DistributedSamplerWrapper
-
 
 
 class TransformSSLDataset:
@@ -260,6 +258,50 @@ def init_datasets(cfg):
         #"backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
         #"backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
 
+        "grid_0e_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/0e/train/'),
+        "grid_2a_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/2a/train/'),
+        "grid_18_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/18/train/'),
+        "grid_cc_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/cc/train/'),
+
+        "val_0e_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/0e/val/'),
+        "val_2a_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/2a/val/'),
+        "val_18_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/18/val/'),
+        "val_cc_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/cc/val/'),
+
+        "grid_0e_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/0e/train/'),
+        "grid_2a_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/2a/train/'),
+        "grid_18_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/18/train/'),
+        "grid_cc_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/cc/train/'),
+
+        "val_0e_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/0e/val/'),
+        "val_2a_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/2a/val/'),
+        "val_18_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/18/val/'),
+        "val_cc_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/cc/val/'),
+
+        "grid_0e_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/0e/train/'),
+        "grid_2a_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/2a/train/'),
+        "grid_18_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/18/train/'),
+        "grid_cc_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/cc/train/'),
+
+        "val_0e_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/0e/val/'),
+        "val_2a_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/2a/val/'),
+        "val_18_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/18/val/'),
+        "val_cc_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/cc/val/'),
+        #"val_0e_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/0e/val'),
+        #"val_2a_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/2a/val'),
+        #"val_18_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/18/val'),
+        #"val_cc_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/cc/val'),
+
+
+        "train_0e_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/0e/train/'),
+        "train_2a_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/2a/train/'),
+        "train_18_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/18/train/'),
+        "train_cc_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/cc/train/'),
+
+        "train_0e_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/0e/train/'),
+        "train_2a_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/2a/train/'),
+        "train_18_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/18/train/'),
+        "train_cc_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/cc/train/'),
 
 # _______________________________________________________ 33________________
 
@@ -283,15 +325,6 @@ def init_datasets(cfg):
         "train_cc_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/cc/train/'),
         #"val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
 
-        "grid_0e_33": D(DATA_DIR/'backs/grid_splits_33/0e/train/'),
-        "grid_2a_33": D(DATA_DIR/'backs/grid_splits_33/2a/train/'),
-        "grid_18_33": D(DATA_DIR/'backs/grid_splits_33/18/train/'),
-        "grid_cc_33": D(DATA_DIR/'backs/grid_splits_33/cc/train/'),
-
-        "val_0e_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/0e/val/'),
-        "val_2a_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/2a/val/'),
-        "val_18_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/18/val/'),
-        "val_cc_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/cc/val/'),
 
         "random_0e_33": D(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
         "random_2a_33": D(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),

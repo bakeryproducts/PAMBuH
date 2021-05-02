@@ -172,8 +172,8 @@ def start(img_name, gpus, model_folder, results, use_tta=True):
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
     dst = Path('output/predicts')
-    scale = 3
-    block_size = 512 * scale
+    scale = 2
+    block_size = 1024 * scale
     batch_size = 16
     pad = 256 * scale
     num_processes = 4

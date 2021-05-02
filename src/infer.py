@@ -7,8 +7,9 @@ from functools import partial
 import cv2
 import torch
 import numpy as np
-import albumentations as albu
 import ttach as tta
+import albumentations as albu
+import albumentations.pytorch as albu_pt
 
 import augs
 
@@ -122,7 +123,7 @@ def get_infer_func(root, use_tta=False):
     return partial(_infer_func, transform=transform, scale=cfg_data.scale, model=model)
 
 
-class SegModel (torch.nn.Module):
+class SegModel(torch.nn.Module):
     def __init__(self, model):
         super(SegModel, self).__init__()
         self.m = model
@@ -131,3 +132,100 @@ class SegModel (torch.nn.Module):
         res = self.m(x)
         if isinstance(res, tuple): res = res[0]
         return res
+
+
+def load_model(model, model_folder_path):
+    model = _load_model_state(model, model_folder_path)
+    model.eval()
+    return model
+
+def _load_model_state(model, path):
+    path = Path(path)
+    state_dict = torch.load(path)['model_state']
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        if k.startswith('module'):
+            k = k.lstrip('module')[1:]
+        new_state_dict[k] = v
+    del state_dict
+    model.load_state_dict(new_state_dict)
+    del new_state_dict
+    return model
+
+class ToTensor(albu_pt.ToTensorV2):
+    def apply_to_mask(self, mask, **params): return torch.from_numpy(mask).permute((2,0,1))
+    def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
+
+class MegaModel(torch.nn.Module):
+    def __init__(self, root):
+        self.averaging = 'mean'
+        self._model_folders = list(Path(root).glob()) # root / model1 ; model2; model3; ...
+        self._model_types = [
+                smp.Unet(encoder_name='timm-regnety_016'), # model1
+                smp.Unet(encoder_name='timm-regnetx_032'), # model2
+                smp.Unet(encoder_name='timm-regnetx_016'),
+                smp.UnetPlusPlus(encoder_name='timm-regnety_016'),
+                ]
+        self._model_scales = [2,2,2,2]
+        assert len(self._model_types) == len(self._model_folders)
+        self.models = self.models_init()
+        mean, std = [0.6226 , 0.4284 , 0.6705], [ 0.1246 , 0.1719 , 0.0956]
+        self.itransform = albu.compose([albu.Normalize(mean=mean, std=std), ToTensor()])
+
+    def models_init(self):
+        models = {}
+        tta_transforms = tta.aliases.d4_transform()
+
+        for mt, mf, ms in zip(self._model_types, self._model_folders, self._model_scales):
+            model_names = mf.glob('*.pth')
+            mm = []
+            for mn in model_names:
+                m = load_model(mt, mn)
+                m = tta.SegmentationTTAWrapper(m, tta_transforms, merge_mode='mean')
+                mm.append(m)
+            models[mf] = {'scale': ms, 'models':mm}
+        return models
+
+    def _prepr(self, img, scale):
+        ch, H,W, dtype = *img.shape, img.dtype
+        assert ch==3 and dtype==np.uint8
+        img = img.transpose(1,2,0)
+        img = cv2.resize(img, (W // scale, H // scale), interpolation=cv2.INTER_AREA)
+        return self.itransform(image=img)['image']
+
+    def each_forward(self, model, scale, batch):
+        #print(batch.shape, batch.dtype, batch.max(), batch.min())
+        with torch.no_grad():
+            res = model(batch)
+            res = torch.sigmoid(res)
+        res = rescale(res, scale)
+        return res
+
+    def forward(self, imgs):
+        batch = None
+        scale = None
+        preds = []
+
+        for mod_dict in self.models: # [{'a/b/c/1231.pth':{'type':Unet,'scale':3 }}, .. ]
+            _scale = mod_dict['scale']
+            if batch is None or scale != _scale:
+                scale = _scale
+                batch = [self._prepr(i, scale) for i in imgs]
+                batch = torch.stack(batch, axis=0).cuda()
+
+            models = mod_dict['models']
+            _predicts = torch.stack([self.each_forward(m, scale, batch) for m in models])
+            preds.append(_predicts)
+
+        res = torch.stack(preds).mean(0) # TODO : mean(0)? do right thing 
+        return  res
+
+ 
+
+
+
+
+
+
+
+

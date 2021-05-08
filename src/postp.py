@@ -172,11 +172,11 @@ def start(img_name, gpus, model_folder, results, use_tta=True):
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
     dst = Path('output/predicts')
-    scale = 2
+    scale = 3
     block_size = 1024 * scale
     batch_size = 16
     pad = 256 * scale
-    num_processes = 4
+    num_processes = 8
     qsize = 24
 
     raw_name = launch_mpq(img_name,

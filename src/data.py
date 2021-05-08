@@ -213,220 +213,68 @@ def init_datasets(cfg):
     AuxDataset = partial(D, hard_mult=mult)
     AuxFrozenDataset = partial(D, hard_mult=mult, frozen=True)
     AuxFPDataset = partial(D, hard_mult=10)
+    AuxPseudoDataset = D
 
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
-        "train1536full": AuxDataset(DATA_DIR/'CUTS/cuts1536x25'),
+        "sclero_33": D(DATA_DIR/'scleros_glomi/scle_cuts_x33_1024/'), 
 
-        #"train_0e": AuxDataset(DATA_DIR/'SPLITS/f_split/0e/train/'),
-        #"val_0e": SegmentDataset(DATA_DIR/'SPLITS/f_split/0e/val/'),
+        "grid_0e_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/0e/train/'),
+        "grid_2a_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/2a/train/'),
+        "grid_18_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/18/train/'),
+        "grid_cc_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/cc/train/'),
 
-        #"train_2a": AuxDataset(DATA_DIR/'SPLITS/f_split/2a/train/'),
-        #"val_2a": SegmentDataset(DATA_DIR/'SPLITS/f_split/2a/val/'),
+        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/0e/val/'),
+        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/2a/val/'),
+        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/18/val/'),
+        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/cc/val/'),
 
-        #"train_18": AuxDataset(DATA_DIR/'SPLITS/f_split/18/train/'),
-        #"val_18": SegmentDataset(DATA_DIR/'SPLITS/f_split/18/val/'),
+        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/0e/train/'),
+        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/2a/train/'),
+        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/18/train/'),
+        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/cc/train/'),
 
-        #"train_cc": AuxDataset(DATA_DIR/'SPLITS/f_split/cc/train/'),
-        #"val_cc": SegmentDataset(DATA_DIR/'SPLITS/f_split/cc/val/'),
+        "grid_0e_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/0e/train/'),
+        "grid_18_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/18/train/'),
+        "grid_ab_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/ab/train/'),
+        "grid_b2_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/b2/train/'),
 
-        "random_0e": D(DATA_DIR/'backs/random_020_splits/0e/train/'),
-        "random_2a": D(DATA_DIR/'backs/random_020_splits/2a/train/'),
-        "random_18": D(DATA_DIR/'backs/random_020_splits/18/train/'),
-        "random_cc": D(DATA_DIR/'backs/random_020_splits/cc/train/'),
+        "val_0e_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/0e/val/'),
+        "val_18_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/18/val/'),
+        "val_ab_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/ab/val/'),
+        "val_b2_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/b2/val/'),
 
+        "train_0e_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/0e/train/'),
+        "train_18_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/18/train/'),
+        "train_ab_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/ab/train/'),
+        "train_b2_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/b2/train/'),
 
-        "sclero": D(DATA_DIR/'scleros_glomi/scle_cuts_1024/'), 
-
-        "ssl_test": SslDS(DATA_DIR/'ssl/test/imgs'),
-        "ssl_val": SslDS(DATA_DIR/'SPLITS/f_split/0e/val/imgs'),
-
-        "backs_cort":    D(DATA_DIR/'backs/backs_x25_cortex/'),
-        "backs_cort_0e": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/0e/train/'),
-        "backs_cort_2a": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/2a/train/'),
-        "backs_cort_18": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/18/train/'),
-        "backs_cort_cc": D(DATA_DIR/'backs/backs_x33_cortex_splits_b/cc/train/'),
-
-        "backs_fp_0e": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/0e/train/'),
-        "backs_fp_2a": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/2a/train/'),
-        "backs_fp_18": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/18/train/'),
-        "backs_fp_cc": AuxFPDataset(DATA_DIR/'backs/backs_FP_splits_33_b/cc/train/'),
-
-        #"backs_cort_0e": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/0e/train/'),
-        #"backs_cort_2a": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/2a/train/'),
-        #"backs_cort_18": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/18/train/'),
-        #"backs_cort_cc": AuxDataset(DATA_DIR/'backs/backs_x25_cortex_splits/cc/train/'),
-
-        "grid_0e_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/0e/train/'),
-        "grid_2a_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/2a/train/'),
-        "grid_18_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/18/train/'),
-        "grid_cc_33": AuxDataset(DATA_DIR/'backs/grid_splits_33/cc/train/'),
-
-        "val_0e_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/0e/val/'),
-        "val_2a_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/2a/val/'),
-        "val_18_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/18/val/'),
-        "val_cc_33": SegmentDataset(DATA_DIR/'backs/grid_splits_33/cc/val/'),
-
-        "grid_0e_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/0e/train/'),
-        "grid_2a_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/2a/train/'),
-        "grid_18_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/18/train/'),
-        "grid_cc_20": AuxDataset(DATA_DIR/'backs/grid_splits_20/cc/train/'),
-
-        "val_0e_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/0e/val/'),
-        "val_2a_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/2a/val/'),
-        "val_18_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/18/val/'),
-        "val_cc_20": SegmentDataset(DATA_DIR/'backs/grid_splits_20/cc/val/'),
-
-        "grid_0e_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/0e/train/'),
-        "grid_2a_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/2a/train/'),
-        "grid_18_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/18/train/'),
-        "grid_cc_50": AuxDataset(DATA_DIR/'backs/grid_splits_50/cc/train/'),
-
-        "val_0e_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/0e/val/'),
-        "val_2a_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/2a/val/'),
-        "val_18_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/18/val/'),
-        "val_cc_50": SegmentDataset(DATA_DIR/'backs/grid_splits_50/cc/val/'),
-        #"val_0e_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/0e/val'),
-        #"val_2a_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/2a/val'),
-        #"val_18_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/18/val'),
-        #"val_cc_50": SegmentDataset(DATA_DIR/'SPLITS/f_split_50/cc/val'),
-
-
-        "train_0e_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/0e/train/'),
-        "train_2a_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/2a/train/'),
-        "train_18_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/18/train/'),
-        "train_cc_50_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_50/cc/train/'),
-
-        "train_0e_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/0e/train/'),
-        "train_2a_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/2a/train/'),
-        "train_18_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/18/train/'),
-        "train_cc_50_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_50/cc/train/'),
+        "pseudo_33": AuxPseudoDataset(DATA_DIR/'CUTS/pseudo_x33/'),
+        "pseudo_33_b": AuxPseudoDataset(DATA_DIR/'CUTS/pseudo_x33_b/'),
 
 # _______________________________________________________ 33________________
 
-        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
+        #"train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
         "train_0e_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
         "train_0e_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/0e/train/'),
         #"val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/val/'),
 
-        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
+        #"train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
         "train_2a_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
         "train_2a_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/2a/train/'),
         #"val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/val/'),
 
-        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
+        #"train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
         "train_18_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
         "train_18_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/18/train/'),
         #"val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/18/val/'),
 
-        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
+        #"train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
         "train_cc_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
         "train_cc_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/cc/train/'),
         #"val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
 
-
-        "random_0e_33": D(DATA_DIR/'backs/random_100_splits_33_b/0e/train/'),
-        "random_2a_33": D(DATA_DIR/'backs/random_100_splits_33_b/2a/train/'),
-        "random_18_33": D(DATA_DIR/'backs/random_100_splits_33_b/18/train/'),
-        "random_cc_33": D(DATA_DIR/'backs/random_100_splits_33_b/cc/train/'),
-
-        "random_0e_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/0e/val/'),
-        "random_2a_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/2a/val/'),
-        "random_18_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/18/val/'),
-        "random_cc_33_val": SegmentDataset(DATA_DIR/'backs/random_100_splits_33_b/cc/val/'),
-
-#_________________________
-#1
-        "train_1e_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/0e/train'),
-        "train_1e_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/2a/train'),
-        "train_1e_84": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/84/train'),
-        "train_1e_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/cc/train'),
-
-        "train_1e_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/0e/val'),
-        "train_1e_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/2a/val'),
-        "train_1e_84_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/84/val'),
-        "train_1e_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/1e/splits/cc/val'),
-#____________________________
-#2
-        "train_4e_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/0e/train'),
-        "train_4e_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/2a/train'),
-        "train_4e_82": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/82/train'),
-        "train_4e_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/cc/train'),
-
-        "train_4e_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/0e/val'),
-        "train_4e_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/2a/val'),
-        "train_4e_82_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/82/val'),
-        "train_4e_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/4e/splits/cc/val'),
-#____________________________
-#3
-        "train_09_0e": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/0e/train'),
-        "train_09_2a": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/2a/train'),
-        "train_09_82": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/82/train'),
-        "train_09_cc": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/cc/train'),
-
-        "train_09_0e_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/0e/val'),
-        "train_09_2a_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/2a/val'),
-        "train_09_82_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/82/val'),
-        "train_09_cc_val": AuxDataset(DATA_DIR/'SPLITS/SMTH/09/splits/cc/val'),
-#____________________________
-#4
-"train_26_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/0e/train'),
-"train_26_2a":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/2a/train'),
-"train_26_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/84/train'),
-"train_26_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/cc/train'),
-
-"train_26_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/0e/val'),
-"train_26_2a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/2a/val'),
-"train_26_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/84/val'),
-"train_26_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/26/splits/cc/val'),
-#____________________________
-#5
-"train_54_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/0e/train'),
-"train_54_2a":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/2a/train'),
-"train_54_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/84/train'),
-"train_54_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/cc/train'),
-          
-"train_54_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/0e/val'),
-"train_54_2a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/2a/val'),
-"train_54_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/84/val'),
-"train_54_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/54/splits/cc/val'),
-
-#____________________________
-#6
-"train_af_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/0e/train'),
-"train_af_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/22/train'),
-"train_af_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/84/train'),
-"train_af_cc":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/cc/train'),
-
-"train_af_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/0e/val'),
-"train_af_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/22/val'),
-"train_af_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/84/val'),
-"train_af_cc_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/af/splits/cc/val'),
-
-#____________________________
-#7
-"train_c6_0e":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/0e/train'),
-"train_c6_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/22/train'),
-"train_c6_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/84/train'),
-"train_c6_c1":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/c1/train'),
-
-"train_c6_0e_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/0e/val'),
-"train_c6_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/22/val'),
-"train_c6_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/84/val'),
-"train_c6_c1_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/c6/splits/c1/val'),
-
-#____________________________
-#8
-"train_e7_0a":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/0a/train'),
-"train_e7_22":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/22/train'),
-"train_e7_84":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/84/train'),
-"train_e7_c1":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/c1/train'),
-
-"train_e7_0a_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/0a/val'),
-"train_e7_22_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/22/val'),
-"train_e7_84_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/84/val'),
-"train_e7_c1_val":AuxDataset(DATA_DIR/'SPLITS/SMTH/e7/splits/c1/val'),
 
     }
     return  DATASETS
@@ -549,7 +397,5 @@ def build_dataloader(cfg, dataset, mode, selective):
         collate_fn=None,
         sampler=sampler,)
     return dl
-
-
 
 

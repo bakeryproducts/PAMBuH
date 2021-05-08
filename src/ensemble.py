@@ -14,15 +14,23 @@ import utils
 
 
 def ensemble_predictions(folders, dst_path):
+    save_masks=False
     mask_names = (folders[0]/'predicts/raw').glob('*.npy')
-    mask_names = [m.name for m in mask_names]
-    for mask_name in tqdm(mask_names):
+    #mask_names = [m.name for m in mask_names]
+    for mask_full in tqdm(mask_names):
+        mask_name = mask_full.name
         logger.log("DEBUG", f'{mask_name}') 
 
         ens_mask = average_preds(mask_name, folders)
         mask_path = dst_path / 'predicts/raw' 
         os.makedirs(mask_path, exist_ok=True)
         np.save(str(mask_path / mask_name), ens_mask)
+
+        if save_masks:
+            logger.log("DEBUG", f'MAX:{ens_mask.max(), ens_mask.dtype, ens_mask.shape}') 
+            mask_path = dst_path / 'predicts/masks' 
+            os.makedirs(mask_path, exist_ok=True)
+            utils.save_tiff_uint8_single_band((255 * ens_mask.squeeze()).astype(np.uint8), str(mask_path/mask_full.stem) + '.tiff', bits=8)
 
 def average_preds(name, folders):
     masks = []
@@ -45,14 +53,10 @@ def ensemble_folds(folders, dst_path):
 if __name__ == '__main__':
     FOLDS = True
     folders = [
-            Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
-            Path('output/2021_Apr_26_20_11_10_PAMBUH/'),
-            Path('output/2021_Apr_26_08_32_37_PAMBUH/'),
-            Path('output/2021_Apr_24_12_05_27_PAMBUH/'),
-            #Path('output/2021_Apr_24_12_05_27_PAMBUH/'),
-            #Path('output/2021_Apr_24_00_57_16_PAMBUH/'),
-            #Path('output/2021_Apr_14_21_08_06_PAMBUH/'),
-            #Path('output/2021_Apr_26_08_32_37_PAMBUH/'),
+            Path('output/S/2021_May_05_01_18_57_PAMBUH_s_L/'),
+            Path('output/S/2021_May_07_11_36_31_PAMBUH_s/'),
+            Path('output/S/2021_May_07_14_59_23_PAMBUH_s/'),
+            Path('output/S/2021_May_07_18_01_35_PAMBUH_s/'),
             ]
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     dst_path = Path(f'output/{timestamp}')

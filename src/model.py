@@ -29,8 +29,14 @@ def model_select():
     #model = partial(smp.Unet, encoder_name='timm-regnetx_032') 
     #model = partial(smp.Unet, encoder_name='timm-regnetx_032')
 
+    #model = partial(smp.Unet, encoder_name='timm-regnetx_032')
     model = partial(smp.Unet, encoder_name='timm-regnety_016')
-     / replace_relu_to_selu(model)
+    #model = partial(smp.Linknet, encoder_name='timm-regnety_016')
+    #model = partial(smp.FPN, encoder_name='timm-regnety_016')
+    #model = partial(smp.PAN, encoder_name='timm-regnety_016')
+    #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnety_016')
+    #model = partial(smp.Unet, encoder_name='se_resnet50')
+    
 
     #model = partial(smp.UnetPlusPlus, encoder_name='timm-regnety_008')
     #model = partial(smp.Linknet, encoder_name='timm-regnety_016')
@@ -41,6 +47,7 @@ def model_select():
 
 def build_model(cfg):
     model = model_select()()
+    #replace_relu_to_silu(model)
     if cfg.TRAIN.INIT_MODEL: 
         logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
@@ -54,10 +61,14 @@ def get_optim(cfg, model):
     base_lr = 1e-4# should be overriden in LR scheduler anyway
     lr = base_lr if not cfg.PARALLEL.DDP else scale_lr(base_lr, cfg) 
     
-    opt = optim.AdamW
-    opt_kwargs = {'amsgrad':True, 'weight_decay':1e-2}
+    #opt = optim.AdamW
+    opt = optim.Adam
+    #opt_kwargs = {'amsgrad':True, 'weight_decay':1e-3}
+    opt_kwargs = {}
     optimizer = opt(tencent_trick(model), lr=lr, **opt_kwargs)
-
+    if cfg.TRAIN.INIT_MODEL: 
+        st =  _load_opt_state(model, cfg.TRAIN.INIT_MODEL)
+        optimizer.load_state_dict(st)
     return optimizer
 
 def wrap_ddp(cfg, model):
@@ -65,7 +76,7 @@ def wrap_ddp(cfg, model):
         #model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = DistributedDataParallel(model, 
                                     device_ids=[cfg.PARALLEL.LOCAL_RANK],
-                                    find_unused_parameters=False,
+                                    find_unused_parameters=True,
                                     broadcast_buffers=True)
     return model
 
@@ -77,6 +88,12 @@ def load_model(cfg, model_folder_path, eval_mode=True):
     model = _load_model_state(model, model_folder_path)
     if eval_mode: model.eval()
     return model
+
+def _load_opt_state(model, path):
+    path = Path(path)
+    if path.suffix != '.pth': path = get_last_model_name(path)
+    opt_state = torch.load(path)['opt_state']
+    return opt_state
 
 def _load_model_state(model, path):
     path = Path(path)

@@ -19,22 +19,17 @@ from model import build_model, wrap_ddp, get_optim
 from callbacks import *
 
 
-def clo(logits, targets, reduction='none'):
-    w1 = 1
-    w2 = 1 - w1 
-    #l1 = loss.lovasz_hinge(logits, targets, reduction=reduction)
-    l1 = loss.symmetric_lovasz(logits, targets)
-    #l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets)
-    #if reduction == 'none': l2 = l2.mean((1,2,3))
-    return l1*w1 #+ l2*w2
-    #return  l2*w2
+def clo(logits, targets, crit):
+    l1 = crit(logits, targets)
+    l2 = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets)
+    return l2 + l1
 
 def sbce(logits, targets, reduction='none'):
-    cr = smp.losses.SoftBCEWithLogitsLoss(smooth_factor=.05)
+    cr = smp.losses.SoftBCEWithLogitsLoss(smooth_factor=.1)
     return cr(logits, targets)
 
 def start(cfg, output_folder):
-    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID', 'SSL'])
+    datasets = data.build_datasets(cfg, dataset_types=['TRAIN', 'VALID'])
     n = cfg.TRAIN.NUM_FOLDS
     if n <= 1: start_fold(cfg, output_folder, datasets)
     else: 
@@ -58,10 +53,12 @@ def start_fold(cfg, output_folder, datasets):
     model = wrap_ddp(cfg, model)
     opt = get_optim(cfg, model)
 
-    #criterion = partial(clo, reduction=('none' if selective else 'mean'))
+    
+    criterion = partial(clo, crit=smp.losses.DiceLoss('binary'))
     #criterion = sbce
     #criterion = loss.symmetric_lovasz
-    criterion = torch.nn.functional.binary_cross_entropy_with_logits
+    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
+    #criterion = smp.losses.DiceLoss('binary')
 
     train_cb = TrainCB(logger=logger) 
     #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 

@@ -17,14 +17,21 @@ from run_inference import start_inf
 from loss import dice_loss
 
 
-def get_split_by_idx(idx):
+def get_split_by_idx(idx, use_split_a=True):
     imgs = Path('input/hm/train').glob('*.tiff')
-    splits = [
-        ['0486052bb', 'e79de561c'],
-        ['2f6ecfcdf', 'afa5e8098'],
-        ['1e2425f28', '8242609fa'],
-        ['cb2d976f4', 'c68fe75ea'],
-        ]
+    if use_split_a:
+        splits = [
+            ['0486052bb', 'e79de561c'],
+            ['2f6ecfcdf', 'afa5e8098'],
+            ['1e2425f28', '8242609fa'],
+            ['cb2d976f4', 'c68fe75ea']]
+    else:
+        splits = [
+                ['0486052bb', 'e79de561c','2f6ecfcdf', 'afa5e8098'],
+                ['1e2425f28', '8242609fa','cb2d976f4', 'c68fe75ea'],
+                ['aaa6a05cc', 'b2dc8411c', '095bf7a1f', '54f2eec69'],
+                ['b9a3865fc', '26dc41664', '4ef6695ce']]
+
     return [i for i in imgs if i.stem in splits[idx]]
 
 def valid_dice(a,b, eps=1e-6):
@@ -97,7 +104,12 @@ def get_stats(dices, thrs):
 def join_totals(model_folder):
     totals = list(Path(model_folder).rglob('total.csv'))
     print(totals)
-    dfs = [pd.read_csv(str(t), index_col=0).loc[:1] for t in totals] 
+
+    dfs = []
+    for t in totals:
+        df = pd.read_csv(str(t), index_col=0)
+        df = df.loc[:len(df)-2] 
+        dfs.append(df)
 
     df = pd.concat(dfs)
     df = df[df['name'] != 'afa5e8098']
@@ -116,8 +128,9 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
     use_tta=True
     to_rle=False
     timestamped = False
+    use_split_a=False
 
-    img_names = get_split_by_idx(split_idx)
+    img_names = get_split_by_idx(split_idx, use_split_a)
     if do_inf:
         res_masks = start_inf(model_folder, img_names, gpus, num_processes, use_tta, threshold, save_predicts, to_rle)
     else:
@@ -154,14 +167,14 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_May_01_14_12_26_PAMBUH/')
+    model_folder = Path('output/2021_May_08_20_09_59_PAMBUH/')
     FOLDS = 0#[0,1,2,3] # or int 
     do_inf = False
     do_dice = not do_inf
     use_torch = not do_inf
     merge = False
-    #gpus = [1,2]
-    gpus = [0,1]
+    #gpus = [2,3]
+    gpus = [0,1,2,3]
 
     if isinstance(FOLDS, list):
         for split_idx in FOLDS:

@@ -1,3 +1,4 @@
+from pathlib import Path
 from collections import OrderedDict
 
 import torch
@@ -46,13 +47,12 @@ def init_model(model):
     if hasattr(model, '_layer_init'):
         model._layer_init()
 
-
-def replace_relu_to_selu(model):
+def replace_relu_to_silu(model):
     for child_name, child in model.named_children():
         if isinstance(child, nn.ReLU):
             setattr(model, child_name, nn.SiLU(inplace=True))
         else:
-            replace_relu_to_selu(child)
+            replace_relu_to_silu(child)
 
 def parse_model_path(p):
     name = str(p.name)

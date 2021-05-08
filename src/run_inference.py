@@ -39,10 +39,10 @@ def start_inf(model_folder, img_names, gpu_list, num_processes, use_tta, thresho
     for img_name, mask_path in result_masks.items():
         mask = np.load(mask_path)[0]
         if save_predicts:
-            mask = utils.sigmoid(mask)
+            #mask = utils.sigmoid(mask)
             out_name = model_folder/'predicts/masks'/img_name.name
             os.makedirs(str(out_name.parent), exist_ok=True)
-            utils.save_tiff_uint8_single_band((255 * mask).astype(np.uint8), str(out_name), bits=8)
+            #utils.save_tiff_uint8_single_band((255 * mask).astype(np.uint8), str(out_name), bits=8)
 
             logger.log('DEBUG', f'{img_name} done')
             if to_rle:
@@ -71,19 +71,21 @@ def read_results(model_folder, img_names, thresholds):
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_Apr_27_13_28_07/')
+    model_folder = Path('output/2021_May_08_17_21_59_PAMBUH/')
     gpu_list = [0,1,2,3]
     thresholds = [.5]#[.55, .5, .48, .47]
     num_processes = len(gpu_list)
 
     img_names = list(Path('input/hm/test').glob('*.tiff'))
     img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
-    #img_names = img_names[-2:]
+    #1/0
+    #img_names = [img_names[2]]
+    print(img_names)
 
     use_tta = True
     save_predicts = True
     to_rle = True
-    do_inf = False
+    do_inf = True
 
     if do_inf:
         results = start_inf(model_folder, 

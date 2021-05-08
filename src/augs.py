@@ -49,9 +49,9 @@ class Augmentator:
                     ], p=p)
     def scale(self, p): return albu.ShiftScaleRotate(0.1, 0.2, 45, p=p)
     def cutout(self, p): return albu.OneOf([
-            albu.Cutout(32, 128, 128, 0,p=.3),
+            albu.Cutout(24, 64, 64, 0, p=.3),
             albu.GridDropout(0.5, fill_value=230, random_offset=True, p=.3),
-            albu.CoarseDropout(32, 128, 128, 16, 64, 64, 220, p=.4)
+            albu.CoarseDropout(24, 64, 64, 16, 16, 16, 220, p=.4)
         ],p=p)
     
     def d4(self): return self.compose([
@@ -60,7 +60,8 @@ class Augmentator:
                     ]) 
 
     def multi_crop(self): return albu.OneOf([
-                    albu.RandomCrop(self.crop_h,self.crop_w),
+                    albu.CenterCrop(self.crop_h, self.crop_w, p=.2),
+                    albu.RandomCrop(self.crop_h, self.crop_w, p=.8),
                     ], p=1)    
 
     def color_jit(self, p): return albu.OneOf([
@@ -103,12 +104,12 @@ class Augmentator:
 
     def additional_res(self):
         return self.compose([
-                    self.scale(p=.3),
+                    self.scale(p=.2),
                     self.custom_augs(p=.1),
                     self.color_jit(p=.3),
-                    self.cutout(p=.2),
+                    self.cutout(p=.1),
                     self.blur(p=.2),
-            ], p=.5)
+            ], p=.4)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
     def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])

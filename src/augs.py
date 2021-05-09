@@ -15,8 +15,9 @@ class ToTensor(albu_pt.ToTensorV2):
 class Augmentator:
     def __init__(self, cfg, compose):
         self.cfg = cfg 
-        self.resize_w, self.resize_h = self.cfg['RESIZE']
-        self.crop_w, self.crop_h = self.cfg['CROP']
+        self.resize_w, self.resize_h = self.cfg.RESIZE
+        self.crop_w, self.crop_h = self.cfg.CROP
+        self.crop_val_w, self.crop_val_h = self.cfg.CROP_VAL if self.cfg.CROP_VAL is not (0,) else seld.cfg.CROP
         self.compose = compose
         
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
@@ -112,7 +113,7 @@ class Augmentator:
             ], p=.4)
 
     def aug_val_forced(self): return self.compose([albu.CropNonEmptyMaskIfExists(self.crop_h,self.crop_w), self.norm()])
-    def aug_val(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w), self.norm()])
+    def aug_val(self): return self.compose([albu.CenterCrop(self.crop_val_h,self.crop_val_w), self.norm()])
     def aug_light(self): return self.compose([albu.CenterCrop(self.crop_h,self.crop_w, p=1), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_wocrop(self): return self.compose([self.resize(), albu.Flip(), albu.RandomRotate90(), self.norm()])
     def aug_blank(self): return self.compose([self.resize()])

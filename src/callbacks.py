@@ -370,12 +370,15 @@ class CheckpointCB(sh.callbacks.Callback):
         self.pct_counter = None if isinstance(self.save_step, int) else self.save_step
         
     def do_saving(self, val='', save_ema=True):
-        state_dict =  get_state_dict(self.model_ema) if save_ema else get_state_dict(self.model)
+        m = self.model_ema if save_ema else self.model
+        name = m.name if hasattr(m, 'name') else None
+        state_dict =  get_state_dict(m) 
         torch.save({
                 'epoch': self.n_epoch,
                 'loss': self.loss,
                 'model_state': state_dict,
                 'opt_state':self.opt.state_dict(), 
+                'model_name':name, 
             }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{val}.pth'))
 
     def after_epoch(self):

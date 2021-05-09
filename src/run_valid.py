@@ -167,8 +167,8 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_May_08_20_09_59_PAMBUH/')
-    FOLDS = 0#[0,1,2,3] # or int 
+    model_folder = Path('output/2021_May_09_01_00_22_PAMBUH/')
+    FOLDS = [0,1,2,3] # or int 
     do_inf = False
     do_dice = not do_inf
     use_torch = not do_inf

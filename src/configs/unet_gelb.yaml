@@ -5,7 +5,7 @@ DATA:
   TRAIN:
     DATASETS: ['train_0e_33_B',  'grid_0e_33_B', 'pseudo_33']
     #FOLDS: [
-    #        ['train_0e_33_B', 'pseudo_33', 'grid_0e_33_B','sclero_33'],
+    #    #['train_0e_33_B', 'pseudo_33', 'grid_0e_33_B','sclero_33'],
     #        ['train_18_33_B', 'pseudo_33', 'grid_18_33_B','sclero_33'],
     #        ['train_ab_33_B', 'pseudo_33', 'grid_ab_33_B','sclero_33'],
     #        ['train_b2_33_B', 'pseudo_33', 'grid_b2_33_B','sclero_33']]
@@ -16,7 +16,7 @@ DATA:
   VALID:
     DATASETS: ['val_0e_33_B']
     #FOLDS: [
-    #        ['val_0e_33_B' ],
+    #    #['val_0e_33_B' ],
     #        ['val_18_33_B' ],
     #        ['val_ab_33_B' ],
     #        ['val_b2_33_B' ]]
@@ -36,8 +36,9 @@ TRANSFORMERS:
     AUG: 'ssl'
   TEST:
     AUG: 'test'
-  #CROP: [512,512]
-  CROP: [1024,1024]
+  CROP: [512,512]
+  #CROP: [1024,1024]
+  CROP_VAL: [512,512]
   RESIZE: [256,256]
   MEAN:
   - 0.6226
@@ -49,14 +50,20 @@ TRANSFORMERS:
   - 0.0956
 
 TRAIN:
-  LRS: [0.00001, 0.0004, 0.000015, 1]
+  LRS: [0.00001, 0.0004, 0.000015, 2]
   DOWNSCALE: 3
   NUM_FOLDS: 1
   SELECTIVE_BP: 1.
   HARD_MULT: 1
-  EMA: 0.999
-  #WEIGHTS: 'input/scores_color_train.pkl'
-  INIT_MODEL: 'output/2021_May_08_20_09_59_PAMBUH/models/'
+  EMA: 0.995
+  #INIT_MODEL: 'output/2021_May_08_17_21_59_PAMBUH/fold_0/models/'
+  INIT_ENCODER: [
+      'output/2021_May_09_01_00_22_PAMBUH/fold_0/models/encoders/e39_t40__AE.epth'
+      #'output/2021_May_09_01_00_22_PAMBUH/fold_1/models/encoders/e28_t60_cmax_ema_0.9513.epth'
+      #'output/2021_May_09_01_00_22_PAMBUH/fold_2/models/encoders/e16_t60_cmax_ema_0.9419.epth'
+      #'output/2021_May_09_01_00_22_PAMBUH/fold_3/models/encoders/e30_t60_cmax_ema_0.9498.epth'
+  ]
+  FREEZE_ENCODER: True
   AMP: True
   GPUS: [0,1,2,3]
   NUM_WORKERS: 4
@@ -65,11 +72,11 @@ TRAIN:
   SCALAR_STEP: 1
   TB_STEP: 2
   
-  EPOCH_COUNT: 40
-  BATCH_SIZE: 8
+  EPOCH_COUNT: 50
+  BATCH_SIZE: 16
 VALID:
   STEP: 2
-  BATCH_SIZE: 8
+  BATCH_SIZE: 16
 SSL:
   STEP: 1
   BATCH_SIZE: 64

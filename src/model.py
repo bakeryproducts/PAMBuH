@@ -51,11 +51,26 @@ def build_model(cfg):
     if cfg.TRAIN.INIT_MODEL: 
         logger.log('DEBUG', f'Init model: {cfg.TRAIN.INIT_MODEL}') 
         model = _load_model_state(model, cfg.TRAIN.INIT_MODEL)
+    elif cfg.TRAIN.INIT_ENCODER != (0,): 
+        logger.log('DEBUG', f'Init encoder: {cfg.TRAIN.INIT_ENCODER}') 
+        if cfg.TRAIN.FOLD_IDX == -1: enc_weights_name = cfg.TRAIN.INIT_ENCODER[0]
+        else: enc_weights_name = cfg.TRAIN.INIT_ENCODER[cfg.TRAIN.FOLD_IDX]
+        _init_encoder(model, enc_weights_name)
     else: pass
+
+    if cfg.TRAIN_FREEZE_ENCODER: model.encoder.requires_grad_(False)
 
     model = model.cuda()
     model.train()
     return model 
+
+def _init_encoder(model, src):
+    enc_state = torch.load(src)['model_state']
+    if "head.fc.weight" not in enc_state: 
+        enc_state["head.fc.weight"] = None
+        enc_state["head.fc.bias"] = None
+
+    model.encoder.load_state_dict(enc_state)
 
 def get_optim(cfg, model):
     base_lr = 1e-4# should be overriden in LR scheduler anyway

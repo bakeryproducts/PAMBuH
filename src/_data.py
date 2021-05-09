@@ -293,6 +293,8 @@ def mean_std_dataset(dataset, parts=200):
 def make_datasets_folds(cfg, datasets, n):
     # datasets: {'TRAIN':[t1,t2,t3,t4], 'VALID':[v1,v2,v3,v4]}
     folded_datasets = [{} for _ in range(n)]
+    assert len(datasets['TRAIN']) == n
+    assert len(datasets['VALID']) == n
     for i, (tds, vds ) in enumerate(zip(datasets['TRAIN'], datasets['VALID'])):
         folded_datasets[i]['VALID'] = vds
         folded_datasets[i]['TRAIN'] = tds

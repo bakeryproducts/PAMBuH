@@ -35,12 +35,13 @@ def start(cfg, output_folder):
     else: 
         datasets_folds = data.make_datasets_folds(cfg, datasets, n)
         for i, i_datasets in enumerate(datasets_folds):
+            cfg.TRAIN.FOLD_IDX = i
             if cfg.PARALLEL.IS_MASTER: print(f'\n\nFOLD # {i}\n\n')
             fold_output = None
             if output_folder:
                 fold_output = output_folder / f'fold_{i}'
                 fold_output.mkdir()
-            start_fold(cfg, fold_output, i_datasets)
+            start_fold(cfg, fold_output, i_datasets) 
             if cfg.PARALLEL.IS_MASTER: print(f'\n\n END OF FOLD # {i}\n\n')
 
 
@@ -55,8 +56,6 @@ def start_fold(cfg, output_folder, datasets):
 
     
     criterion = partial(clo, crit=smp.losses.DiceLoss('binary'))
-    #criterion = sbce
-    #criterion = loss.symmetric_lovasz
     #criterion = torch.nn.functional.binary_cross_entropy_with_logits
     #criterion = smp.losses.DiceLoss('binary')
 

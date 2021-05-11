@@ -21,44 +21,10 @@ from _data import *
 from sampler import GdalSampler
 
 
-class TransformSSLDataset:
-    def __init__(self, dataset, transforms):
-        self.dataset = dataset
-        self.transforms = albu.Compose([]) if transforms is None else transforms
-        self.norm = self.transforms[-1]
-    
-    def __getitem__(self, idx):
-        i = self.dataset.__getitem__(idx)
-        ai = self.transforms(image=i)['image']
-        i = self.norm(image=i)['image']
-        return ai, i
-    
-    def __len__(self): return len(self.dataset)
-    
 class TagDataset:
     def __init__(self, ds, tag): self.ds, self.tag = ds, tag
     def __getitem__(self, idx): return (*self.ds[idx], self.tag)
     def __len__(self): return len(self.ds)
-
-class SSLDataset:
-    def __init__(self, root, crop_size):
-        self.dataset = ImageDataset(root, '*/*.png')
-        self.dataset.process_item = expander
-        self.dataset = MultiplyDataset(self.dataset, 8)
-        self.d4 = albu.Compose([
-                                albu.RandomCrop(*crop_size),
-                                albu.ShiftScaleRotate(0.0625, 0.1, 45, p=.3), 
-                                albu.Flip(),
-                                albu.RandomRotate90()
-                                ])
-            
-    def __getitem__(self, idx):
-        i = self.dataset[idx]
-        i = self.d4(image=i)['image']
-        return i
-
-    def __len__(self): return len(self.dataset)
-
 
 class SegmentDataset:
     '''
@@ -218,64 +184,20 @@ def init_datasets(cfg):
     SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
-        "sclero_33": D(DATA_DIR/'scleros_glomi/scle_cuts_x33_1024/'), 
+        "grid_0e_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/0e/train/'),
+        "grid_2a_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/2a/train/'),
+        "grid_18_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/18/train/'),
+        "grid_cc_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/cc/train/'),
 
-        "grid_0e_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/0e/train/'),
-        "grid_2a_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/2a/train/'),
-        "grid_18_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/18/train/'),
-        "grid_cc_33": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024/cc/train/'),
+        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/0e/val/'),
+        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/2a/val/'),
+        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/18/val/'),
+        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/cc/val/'),
 
-        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/0e/val/'),
-        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/2a/val/'),
-        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/18/val/'),
-        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024/cc/val/'),
-
-        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/0e/train/'),
-        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/2a/train/'),
-        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/18/train/'),
-        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024/cc/train/'),
-
-        "grid_0e_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/0e/train/'),
-        "grid_18_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/18/train/'),
-        "grid_ab_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/ab/train/'),
-        "grid_b2_33_B": AuxDataset(DATA_DIR/'backs/grid_splits_33_1024_B/b2/train/'),
-
-        "val_0e_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/0e/val/'),
-        "val_18_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/18/val/'),
-        "val_ab_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/ab/val/'),
-        "val_b2_33_B": SegmentDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/b2/val/'),
-
-        "train_0e_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/0e/train/'),
-        "train_18_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/18/train/'),
-        "train_ab_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/ab/train/'),
-        "train_b2_33_B": AuxDataset(DATA_DIR/'SPLITS/f_split_33_1024_B/b2/train/'),
-
-        "pseudo_33": AuxPseudoDataset(DATA_DIR/'CUTS/pseudo_x33/'),
-        "pseudo_33_b": AuxPseudoDataset(DATA_DIR/'CUTS/pseudo_x33_b/'),
-
-# _______________________________________________________ 33________________
-
-        #"train_0e_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
-        "train_0e_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/train/'),
-        "train_0e_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/0e/train/'),
-        #"val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/0e/val/'),
-
-        #"train_2a_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
-        "train_2a_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/train/'),
-        "train_2a_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/2a/train/'),
-        #"val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/2a/val/'),
-
-        #"train_18_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
-        "train_18_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/18/train/'),
-        "train_18_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/18/train/'),
-        #"val_18_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/18/val/'),
-
-        #"train_cc_33": AuxDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
-        "train_cc_33_frozen": AuxFrozenDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/train/'),
-        "train_cc_33_soft": AuxDataset(DATA_DIR/'SPLITS/f_split_soft_b_33/cc/train/'),
-        #"val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/f_split_b_33/cc/val/'),
-
-
+        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/0e/train/'),
+        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/2a/train/'),
+        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/18/train/'),
+        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/cc/train/'),
     }
     return  DATASETS
 
@@ -320,7 +242,6 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
     def train_trans_get(*args, **kwargs): return augs.get_aug(*args, **kwargs)
 
     transform_factory = {
-            #'TRAIN':{'factory':TagTransformDataset, 'transform_getter':train_trans_get},
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID2':{'factory':TransformDataset, 'transform_getter':train_trans_get},
@@ -383,8 +304,6 @@ def build_dataloader(cfg, dataset, mode, selective):
             sampler = DistributedSampler(dataset, num_replicas=cfg.PARALLEL.WORLD_SIZE, rank=cfg.PARALLEL.LOCAL_RANK, shuffle=True)
 
     num_workers = cfg.TRAIN.NUM_WORKERS 
-    #if mode == 'TRAIN': shuffle = sampler is None
-    #else: shuffle = False
     shuffle = sampler is None
 
     dl = DataLoader(

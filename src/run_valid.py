@@ -50,7 +50,8 @@ def calc_all_dices(res_masks, thrs, use_torch):
             import torch
             os.environ['CUDA_VISIBLE_DEVICES'] = '3'
             gt = torch.from_numpy(gt)
-            mask = torch.from_numpy(mask).float()
+            #mask = torch.from_numpy(mask).float()
+            mask = torch.from_numpy(mask).half()
 
         name = img_name.stem
 
@@ -69,6 +70,8 @@ def calc_all_dices(res_masks, thrs, use_torch):
         ds = np.array(ds)
         print(name, ds.max(), thrs[np.argmax(ds)])
         dices[name] = ds
+        del mask
+        del gt
     return dices
 
 def calc_common_dice(dices, thrs):
@@ -167,8 +170,8 @@ def start_valid(model_folder, split_idx, do_inf, merge, gpus, use_torch, do_dice
 
 
 if __name__ == '__main__':
-    model_folder = Path('output/2021_May_09_01_00_22_PAMBUH/')
-    FOLDS = [0,1,2,3] # or int 
+    model_folder = Path('output/2021_May_10_01_07_51_PAMBUH/fold_0')
+    FOLDS = 0#[0,1,2,3] # or int 
     do_inf = False
     do_dice = not do_inf
     use_torch = not do_inf

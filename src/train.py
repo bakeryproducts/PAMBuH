@@ -35,7 +35,7 @@ def start(cfg, output_folder):
     else: 
         datasets_folds = data.make_datasets_folds(cfg, datasets, n)
         for i, i_datasets in enumerate(datasets_folds):
-            cfg.TRAIN.FOLD_IDX = i
+            cfg["TRAIN"]["FOLD_IDX"] = i
             if cfg.PARALLEL.IS_MASTER: print(f'\n\nFOLD # {i}\n\n')
             fold_output = None
             if output_folder:
@@ -53,14 +53,12 @@ def start_fold(cfg, output_folder, datasets):
     model_ema = ema.ModelEmaV2(model, decay=cfg.TRAIN.EMA)
     model = wrap_ddp(cfg, model)
     opt = get_optim(cfg, model)
+    if cfg.TRAIN.FREEZE_ENCODER: unwrap_model(model).encoder.requires_grad_(False)
 
     
     criterion = partial(clo, crit=smp.losses.DiceLoss('binary'))
-    #criterion = torch.nn.functional.binary_cross_entropy_with_logits
-    #criterion = smp.losses.DiceLoss('binary')
 
     train_cb = TrainCB(logger=logger) 
-    #train_cb = TrainSSLCB(ssl_dl=dls['SSL'], logger=logger) 
     val_cb = ValEMACB(model_ema=model_ema, logger=logger) if cfg.TRAIN.EMA else ValCB(logger=logger)
     
     if cfg.PARALLEL.IS_MASTER:
@@ -93,9 +91,6 @@ def start_fold(cfg, output_folder, datasets):
 
     lr_cos_sched = sh.schedulers.combine_scheds([
         [.2, sh.schedulers.sched_cos(l0,l1)],
-        #[.1, sh.schedulers.sched_cos(l1,l3)],
-        #[.1, sh.schedulers.sched_cos(l3,l4)],
-        #[.1, sh.schedulers.sched_cos(l4,l5)],
         [.8, sh.schedulers.sched_cos(l1,l2)],
         ])
     lrcb = sh.callbacks.ParamSchedulerCB('before_epoch', 'lr', lr_cos_sched)
@@ -114,6 +109,7 @@ def start_fold(cfg, output_folder, datasets):
     learner = sh.learner.Learner(model, opt, sh.utils.AttrDict(dls), criterion, 0, cbs, batch_bar, epoch_bar, val_interval, cfg=cfg)
     learner.fit(n_epochs)
 
+    # Just in case  
     gc.collect()
     torch.cuda.empty_cache()
     del dls 

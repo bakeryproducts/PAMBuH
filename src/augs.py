@@ -11,7 +11,6 @@ class ToTensor(albu_pt.ToTensorV2):
     def apply_to_mask(self, mask, **params): return torch.from_numpy(mask).permute((2,0,1))
     def apply(self, image, **params): return torch.from_numpy(image).permute((2,0,1))
 
-
 class Augmentator:
     def __init__(self, cfg, compose):
         self.cfg = cfg 
@@ -23,9 +22,6 @@ class Augmentator:
         self.mean = self.cfg.MEAN if self.cfg.MEAN is not (0,) else (0.46454108, 0.43718538, 0.39618185)
         self.std = self.cfg.STD if self.cfg.STD is not (0,) else (0.23577851, 0.23005974, 0.23109385)
     
-        self.Alights = partial(AddLightning, imgs_path='input/aug_data/light/', crop_w=self.crop_w) # cfg is partial! there is no cfg.INPUTS here
-        self.FakeGlo = partial(AddFakeGlom, masks_path='input/CUTS/cuts_B_1536x33/masks/', crop_w=self.crop_w) # cfg is partial! there is no cfg.INPUTS here
-
 
     def get_aug(self, kind):
         if kind == 'val': return self.aug_val()
@@ -98,8 +94,6 @@ class Augmentator:
                                                     ])
 
     def custom_augs(self, p): return albu.OneOf([
-                    #self.Alights(p=.3),
-                    #self.FakeGlo(p=.1),
                     AddGammaCorrection(p=.3),
         ], p=p)
 

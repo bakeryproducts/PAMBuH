@@ -164,6 +164,13 @@ def launch_mpq(img_name, model_folder, batch_size, block_size, pad, num_processe
 
             
 def start(img_name, gpus, model_folder, results, use_tta=True):
+    # params for inference, V100 32GB probably required for huge patches / batches
+    scale = 3
+    block_size = 1024 * scale
+    batch_size = 8
+    pad = 256 * scale
+    num_processes = 8
+    qsize = 24
 
     random.seed(hash(str(img_name)))
     gpu = gpu_select(gpus)
@@ -171,13 +178,6 @@ def start(img_name, gpus, model_folder, results, use_tta=True):
     os.environ['CPL_LOG'] = '/dev/null'
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
-    dst = Path('output/predicts')
-    scale = 3
-    block_size = 1024 * scale
-    batch_size = 12
-    pad = 256 * scale
-    num_processes = 8
-    qsize = 24
 
     raw_name = launch_mpq(img_name,
                         model_folder, 
@@ -193,21 +193,7 @@ def start(img_name, gpus, model_folder, results, use_tta=True):
 
 if __name__ == '__main__':
     # Single process run, mp in run_inference
-    src = Path('input/hm/test')
-    img_names = src.glob('*.tiff')
-    img_names = list(img_names)
-    img_names = [img_names[i] for i in [2,0,4,1,3]]#aa first
-    print(list(img_names))
-
-    model_folder = 'output/2021_Mar_21_18_52_11_PAMBUH/'
-    gpus = ['0']
-    results = {}
-
-    for img_name in img_names:
-        print(f'BROKEN Creating mask for {img_name}')
-        #start(model_folder, gpus, img_name, results)
-
-    #dump_to_csv(results, model_folder, threshold)
+    print(f'use run_inference.py')
 
 
 def filter_mask(mask, name):

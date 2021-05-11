@@ -172,12 +172,18 @@ class TrainCB(sh.callbacks.Callback):
     def __init__(self, logger=None): 
         sh.utils.store_attr(self, locals())
         self.cl_criterion = partial(torch.nn.functional.binary_cross_entropy_with_logits, reduction='none')
-        #self.cl_criterion = smp.losses.SoftBCEWithLogitsLoss(reduction='none')
         self.cll = []
+
+    def before_fit(self): self.freeze_enc = self.kwargs['cfg']["TRAIN"]["FREEZE_ENCODER"]
 
     @sh.utils.on_train
     def before_epoch(self):
         if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
+        if self.freeze_enc and self.np_epoch > .45:
+            self.freeze_enc = False
+            self.log_debug(f'UNFREEZING ENCODER at {self.np_epoch}')
+            unwrap_model(self.model).encoder.requires_grad_(True)
+
         for i in range(len(self.opt.param_groups)):
             self.learner.opt.param_groups[i]['lr'] = self.lr  
         self.cl_gt = []
@@ -377,8 +383,8 @@ class CheckpointCB(sh.callbacks.Callback):
                 'epoch': self.n_epoch,
                 'loss': self.loss,
                 'model_state': state_dict,
-                'opt_state':self.opt.state_dict(), 
-                'model_name':name, 
+                'opt_state': self.opt.state_dict(), 
+                'model_name': name, 
             }, str(self.save_path / f'e{self.n_epoch}_t{self.total_epochs}_{val}.pth'))
 
     def after_epoch(self):

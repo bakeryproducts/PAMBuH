@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 from tqdm import tqdm
@@ -51,7 +52,13 @@ def start(root, dst_path):
         print(tiff_file, W,H, mask.shape, mask.dtype, mask.max())
         save_mask(mask, dst_path / tiff_file.name)
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--src", default='input/hm/', type=str)
+    parser.add_argument("--dst", default='input/bigmasks', type=str)
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
-    # TODO argparse
-    start('input/hm', 'input/bigmasks')
+    args = parse_args()
+    start(args.src, args.dst)

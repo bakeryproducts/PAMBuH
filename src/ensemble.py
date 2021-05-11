@@ -53,10 +53,8 @@ def ensemble_folds(folders, dst_path):
 if __name__ == '__main__':
     FOLDS = True
     folders = [
-            Path('output/S/2021_May_05_01_18_57_PAMBUH_s_L/'),
-            Path('output/S/2021_May_07_11_36_31_PAMBUH_s/'),
-            Path('output/S/2021_May_07_14_59_23_PAMBUH_s/'),
-            Path('output/S/2021_May_07_18_01_35_PAMBUH_s/'),
+            Path('output/2021_May_10_08_01_00_PAMBUH/'),
+            Path('output/2021_May_10_10_45_07_PAMBUH/'),
             ]
     timestamp = '{:%Y_%b_%d_%H_%M_%S}'.format(datetime.datetime.now())
     dst_path = Path(f'output/{timestamp}')

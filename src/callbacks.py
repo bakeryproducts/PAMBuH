@@ -28,8 +28,6 @@ def denorm(images, mean=(0.46454108, 0.43718538, 0.39618185), std=(0.23577851, 0
     return images
 
 def get_xb_yb(b):
-    #if isinstance(b[1], tuple): return b[0], b[1][0]
-    #else: return b
     return b[0], b[1]
 
 def get_pred(m, xb):
@@ -38,7 +36,6 @@ def get_pred(m, xb):
     else: return r, None
 
 def get_tag(b):
-    #if isinstance(b[1], tuple): return b[1][1]
     if len(b) == 3: return b[2]
     else: return None
 
@@ -202,83 +199,6 @@ class TrainCB(sh.callbacks.Callback):
         self.learner.loss = loss
         #torch.nn.utils.clip_grad_norm_(self.model.parameters(), .8)
         self.learner.loss.backward()
-        self.learner.opt.step()
-        self.learner.opt.zero_grad(set_to_none=True)
-
-        if self.kwargs['cfg'].TRAIN.EMA: self.learner.model_ema.update(self.model)
-
-
-class TrainSSLCB(sh.callbacks.Callback):
-    def __init__(self, ssl_dl, logger=None): 
-        sh.utils.store_attr(self, locals())
-        self.epoch_start_ssl = 3
-        #self.ssl_criterion = loss.symmetric_lovasz
-        #self.ssl_criterion = torch.nn.BCEWithLogitsLoss(reduction='none')
-        self.ssl_criterion = smp.losses.SoftBCEWithLogitsLoss(reduction='none', smooth_factor=.1)
-        self.ssl_loss_scale = .1
-        self.high_thr = .8
-        self.low_thr = .2
-        self.ssl_l = [0]
-
-    @sh.utils.on_train
-    def before_epoch(self):
-        if self.kwargs['cfg'].PARALLEL.DDP: self.dl.sampler.set_epoch(self.n_epoch)
-        if self.kwargs['cfg'].PARALLEL.DDP: self.ssl_dl.sampler.set_epoch(self.n_epoch)
-        self.ssl_it = iter(self.ssl_dl)
-        self.ssl_loss_scale = min(self.ssl_loss_scale * 1.05 , 2)
-
-        self.log_debug(f'BASE: {np.mean(self.ssl_l)}, {self.ssl_loss_scale}')
-        self.ssl_l = [0]
-
-        for i in range(len(self.opt.param_groups)):
-            self.learner.opt.param_groups[i]['lr'] = self.lr  
-
-    def ssl_step(self):
-        ssl_loss = None
-        if self.n_epoch >= self.epoch_start_ssl:
-            try:
-                xb, yb = get_xb_yb(next(self.ssl_it))
-            except StopIteration:
-                print('maxit:', self.np_batch)
-                return None
-
-            xb = xb.cuda()
-            with torch.no_grad():
-                ssl_yb, _ = get_pred(self.learner.model_ema.module, yb.cuda())
-                ssl_yb = ssl_yb.sigmoid()
-                ssl_yb[ssl_yb<self.low_thr] = 0
-                ssl_yb[ssl_yb>self.high_thr] = 1
-
-            preds, _ = get_pred(self.model, xb)
-            ssl_loss = self.ssl_criterion(preds, ssl_yb) 
-            with torch.no_grad():
-                mask = (ssl_yb > self.low_thr) * (ssl_yb < self.high_thr) 
-            ssl_loss[mask] = 0
-            ssl_loss = ssl_loss.mean()
-
-            if self.np_batch > .9 and np.random.random() > .5: 
-                # Randomly drop results to TB
-                #print(xbs.shape, ybs.shape, preds.shape)
-                ssl_yb[mask] = 0
-                self.learner.batch = (xb,ssl_yb)
-                self.learner.preds = preds
-
-        return ssl_loss
-
-    def train_step(self):
-        xb, yb = get_xb_yb(self.batch)
-        self.learner.preds , _ = get_pred(self.model, xb)
-        base_loss = self.loss_func(self.learner.preds, yb)
-        ssl_loss = self.ssl_step()
-
-        if ssl_loss is not None:
-            #self.log_debug(f'BASE: {base_loss.item()}, SSL:{ssl_loss.item()}, SCALED:{self.ssl_loss_scale * ssl_loss.item()}')
-            self.ssl_l.append(ssl_loss.item())
-            loss = base_loss + ssl_loss * self.ssl_loss_scale
-        else: loss = base_loss
-
-        loss.backward()
-        self.learner.loss = loss
         self.learner.opt.step()
         self.learner.opt.zero_grad(set_to_none=True)
 

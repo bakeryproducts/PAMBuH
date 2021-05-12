@@ -191,6 +191,19 @@ There are switchable options in script, such as:
 
 This script is quite different from kaggle inference notebook, since we own and can use more resources locally
 
+### Ensembling
+
+Ensembling of the results of several models:
+1. Each model of future ensemble should go through inference phase
+2. Models folders should be listed in src/ensemble.py
+3. Run `python3 src/ensemble.py`
+4. Models predictions will be averaged and saved to new folder
+5. Run 
+
+```
+python3 src/run_inference.py  --do_rle --model_folder output/2021_feb_07_12_13_55  --test_folder input/HUBMAP/test
+```
+
 Gleb Sokolov, gleb.m.sokolov@gmail.com
 
 

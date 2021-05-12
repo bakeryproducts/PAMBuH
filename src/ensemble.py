@@ -51,7 +51,7 @@ def ensemble_folds(folders, dst_path):
 
     
 if __name__ == '__main__':
-    FOLDS = True
+    FOLDS = False
     folders = [
             Path('output/2021_May_10_08_01_00_PAMBUH/'),
             Path('output/2021_May_10_10_45_07_PAMBUH/'),

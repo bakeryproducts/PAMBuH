@@ -72,6 +72,7 @@ def read_results(model_folder, img_names, thresholds):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_folder", type=str)
+    parser.add_argument("--only_rle", const=True, default=True, nargs='?')
     parser.add_argument("--test_folder", default='input/hm/test', type=str)
     args = parser.parse_args()
     return args
@@ -90,12 +91,13 @@ if __name__ == '__main__':
     args = parse_args()
     model_folder = Path(args.model_folder) #'output/2021_May_08_17_21_59_PAMBUH/'
     test_folder = Path(args.test_folder)
+    do_inf = not args.only_rle # Do the prediction part, or just assemble results in rle
+
     gpu_list = [0]#[0,1,2,3]
     thresholds = [.5]
     use_tta = True
     save_predicts = True
     to_rle = True
-    do_inf = True
     num_processes = len(gpu_list)
 
     img_names = list(Path(test_folder).glob('*.tiff'))

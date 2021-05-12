@@ -53,6 +53,8 @@ def cut_glomi(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
+            if idx > 100: return
+
 def cut_grid(imgs_path, masks_path, dst_path):
     filt = partial(utils.filter_ban_str_in_name, bans=['-', '_ell'])
     masks_fns = sorted(utils.get_filenames(masks_path, '*.tiff', filt))
@@ -96,6 +98,7 @@ def cut_grid(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
+            if idx > 100: return
 
 if __name__  == "__main__":
     src = 'input/'

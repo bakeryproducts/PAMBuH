@@ -178,6 +178,9 @@ python3 src/run_inference.py  --model_folder output/2021_feb_07_12_13_55  --test
 ```
 
 Script will select best model from checkpoints based on val score, and run inference on .tiff images in specified folder
+
+Results will be placed in model_folder
+
 There are switchable options in script, such as:
 
 - save RLE

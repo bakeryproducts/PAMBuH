@@ -54,7 +54,8 @@ def cut_glomi(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
-            if idx > 10: break
+            # DEBUG MODE:
+            #if idx > 10: break
 
 def cut_grid(imgs_path, masks_path, dst_path):
     filt = partial(utils.filter_ban_str_in_name, bans=['-', '_ell'])
@@ -99,7 +100,8 @@ def cut_grid(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
-            if idx > 10: break
+            # DEBUG MODE:
+            #if idx > 10: break
 
 if __name__  == "__main__":
     src = 'input/'

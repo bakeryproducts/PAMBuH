@@ -15,7 +15,7 @@ from tqdm import tqdm
 import rasterio as rio
 
 import utils
-import tf_reader
+from tf_reader import TFReader
 import rle2tiff
 
 import warnings
@@ -62,9 +62,8 @@ def pad_block(y,x,h,w, pad): return np.array([y-pad, x-pad, h+2*pad, w+2*pad])
 def crop(src, y,x,h,w): return src[..., y:y+h, x:x+w]
 def crop_rio(p, y,x,h,w):
     #ds = rio.open(str(p))
-    ds = tf_reader.open(str(p))
+    ds = TFReader(str(p))
     block = ds.read(window=((y,y+h),(x,x+w)), boundless=True)
-    ds.close()
     del ds
     return block
 

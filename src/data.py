@@ -181,23 +181,22 @@ def init_datasets(cfg):
     AuxFPDataset = partial(D, hard_mult=10)
     AuxPseudoDataset = D
 
-    SslDS = partial(SSLDataset, crop_size=cfg['TRANSFORMERS']['CROP'])
     
     DATASETS = {
-        "grid_0e_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/0e/train/'),
-        "grid_2a_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/2a/train/'),
-        "grid_18_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/18/train/'),
-        "grid_cc_33": AuxDataset(DATA_DIR/'SPLITS/grid_splits_33_1024/cc/train/'),
+        "grid_0e_33": AuxDataset(DATA_DIR/'SPLITS/grid_split/0e/train/'),
+        "grid_2a_33": AuxDataset(DATA_DIR/'SPLITS/grid_split/2a/train/'),
+        "grid_18_33": AuxDataset(DATA_DIR/'SPLITS/grid_split/18/train/'),
+        "grid_cc_33": AuxDataset(DATA_DIR/'SPLITS/grid_split/cc/train/'),
 
-        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/0e/val/'),
-        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/2a/val/'),
-        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/18/val/'),
-        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/split_33_1024/cc/val/'),
+        "val_0e_33": SegmentDataset(DATA_DIR/'SPLITS/glomi_split/0e/val/'),
+        "val_2a_33": SegmentDataset(DATA_DIR/'SPLITS/glomi_split/2a/val/'),
+        "val_18_33": SegmentDataset(DATA_DIR/'SPLITS/glomi_split/18/val/'),
+        "val_cc_33": SegmentDataset(DATA_DIR/'SPLITS/glomi_split/cc/val/'),
 
-        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/0e/train/'),
-        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/2a/train/'),
-        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/18/train/'),
-        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/split_33_1024/cc/train/'),
+        "train_0e_33": AuxDataset(DATA_DIR/'SPLITS/glomi_split/0e/train/'),
+        "train_2a_33": AuxDataset(DATA_DIR/'SPLITS/glomi_split/2a/train/'),
+        "train_18_33": AuxDataset(DATA_DIR/'SPLITS/glomi_split/18/train/'),
+        "train_cc_33": AuxDataset(DATA_DIR/'SPLITS/glomi_split/cc/train/'),
     }
     return  DATASETS
 
@@ -245,7 +244,6 @@ def build_datasets(cfg, mode_train=True, num_proc=4, dataset_types=['TRAIN', 'VA
             'TRAIN':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID':{'factory':TransformDataset, 'transform_getter':train_trans_get},
             'VALID2':{'factory':TransformDataset, 'transform_getter':train_trans_get},
-            'SSL':{'factory':TransformSSLDataset, 'transform_getter':train_trans_get},
             'TEST':{'factory':TransformDataset, 'transform_getter':train_trans_get},
         }
 

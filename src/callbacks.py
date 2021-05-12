@@ -107,15 +107,16 @@ class TBMetricCB(TrackResultsCB):
         self.valid_dice2 =  sum(self.learner.extra_accs) / sum(self.learner.extra_samples_count)
         self.parse_metrics(self.validation_metrics)
 
+        save_val_threshold = .9 # Only save models that do DICE > 0.90
         if self.valid_dice > self.max_dice:
             self.max_dice = self.valid_dice
-            if self.max_dice > .91:
+            if self.max_dice > save_val_threshold:
                 chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
                 if chpt_cb is not None: chpt_cb.do_saving(f'cmax_val_{round(self.max_dice, 4)}', save_ema=False)
 
         if self.valid_dice2 > self.max_dice:
             self.max_dice = self.valid_dice2
-            if self.max_dice > .91:
+            if self.max_dice > save_val_threshold:
                 chpt_cb = get_cb_by_instance(self.learner.cbs, CheckpointCB)
                 if chpt_cb is not None: chpt_cb.do_saving(f'cmax_ema_{round(self.max_dice, 4)}', save_ema=True)
             
@@ -309,7 +310,7 @@ class CheckpointCB(sh.callbacks.Callback):
 
     def after_epoch(self):
         save = False
-        if self.n_epoch == self.total_epochs - 1: save=True
+        if self.n_epoch == self.total_epochs - 1: save=False
         elif isinstance(self.save_step, int): save = self.save_step % self.n_epoch == 0 
         else:
             if self.np_epoch > self.pct_counter:

@@ -37,7 +37,10 @@ def start(cfg, output_folder):
         datasets_folds = data.make_datasets_folds(cfg, datasets, n)
         for i, i_datasets in enumerate(datasets_folds):
             cfg["TRAIN"]["FOLD_IDX"] = i
-            if cfg.PARALLEL.IS_MASTER: print(f'\n\nFOLD # {i}\n\n')
+            if cfg.PARALLEL.IS_MASTER: 
+                print(f'\n\nFOLD # {i}\n\n')
+                utils.dump_params(cfg, output_folder)
+
             fold_output = None
             if output_folder:
                 fold_output = output_folder / f'fold_{i}'

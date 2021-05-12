@@ -398,3 +398,6 @@ for img_name in imgs:
     print(img_name)
     rle = start(img_name, do_inference=do_inference)
     subm[img_name.stem] = {'id':img_name.stem, 'predicted': rle}
+
+df_sub = pd.DataFrame(subm).T
+df_sub.to_csv('submission.csv', index=False)

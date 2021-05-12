@@ -21,12 +21,14 @@ def cut_glomi(imgs_path, masks_path, dst_path):
     filt = partial(utils.filter_ban_str_in_name, bans=['-', '_ell'])
     masks_fns = sorted(utils.get_filenames(masks_path, '*.tiff', filt))
     img_fns = sorted(utils.get_filenames(imgs_path, '*.tiff', filt))
+    ann_fns = sorted(utils.get_filenames(imgs_path, '*.json', filt))
+    #print(img_fns, masks_fns)
     SCALE = 3
     _base_wh = 1024
     wh = (_base_wh*SCALE, _base_wh*SCALE)
     
-    for i_fn, m_fn, in tqdm(zip(img_fns, masks_fns)):
-        s = sampler.GridSampler(i_fn, m_fn, wh)
+    for i_fn, m_fn, a_fn in tqdm(zip(img_fns, masks_fns, ann_fns)):
+        s = sampler.GdalSampler(i_fn, m_fn, a_fn, wh)
         
         img_dir = dst_path / 'imgs' / i_fn.with_suffix('').name
         os.makedirs(str(img_dir), exist_ok=True)
@@ -55,16 +57,18 @@ def cut_glomi(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(mask_name), m)
 
             # DEBUG MODE:
-            #if idx > 10: break
+            if idx > 10: break
 
 def cut_grid(imgs_path, masks_path, dst_path):
     filt = partial(utils.filter_ban_str_in_name, bans=['-', '_ell'])
-    masks_fns = sorted(utils.get_filenames(masks_path, '*.tiff', filt))
     img_fns = sorted(utils.get_filenames(imgs_path, '*.tiff', filt))
+    masks_fns = sorted(utils.get_filenames(masks_path, '*.tiff', filt))
+
     SCALE = 3
     _base_wh = 1024
     wh = (_base_wh*SCALE, _base_wh*SCALE)
 
+    print(img_fns, masks_fns)
 
     for i_fn, m_fn, in tqdm(zip(img_fns, masks_fns)):
         s = sampler.GridSampler(i_fn, m_fn, wh)
@@ -101,7 +105,7 @@ def cut_grid(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(mask_name), m)
 
             # DEBUG MODE:
-            #if idx > 10: break
+            if idx > 10: break
 
 if __name__  == "__main__":
     src = 'input/'
@@ -120,10 +124,10 @@ if __name__  == "__main__":
     grid_path = src / 'CUTS/grid_x33_1024/'
     glomi_path = src / 'CUTS/glomi_x33_1024/'
 
-    # this cuts big tiffs on tile based grid
-    if not grid_path.exists(): cut_grid(imgs_path, masks_path, grid_path)
     # this cuts big tiffs based on annotation json, each object get its own cut
     if not glomi_path.exists(): cut_glomi(imgs_path, masks_path, glomi_path)
+    # this cuts big tiffs on tile based grid
+    if not grid_path.exists(): cut_grid(imgs_path, masks_path, grid_path)
 
     # This breaks cutted tiff's into train and val splits based in tiff ids
     do_split(grid_path, src / 'SPLITS/grid_split' )

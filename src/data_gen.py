@@ -1,3 +1,4 @@
+import os
 from PIL import Image
 from pathlib import Path
 from functools import partial, reduce
@@ -13,6 +14,7 @@ import utils
 import data
 import sampler
 from rle2tiff import start as create_masks
+from split_gen import do_split
 
 
 def cut_glomi(imgs_path, masks_path, dst_path):
@@ -22,7 +24,6 @@ def cut_glomi(imgs_path, masks_path, dst_path):
     SCALE = 3
     _base_wh = 1024
     wh = (_base_wh*SCALE, _base_wh*SCALE)
-    s = sampler.GdalSampler(i_fn, m_fn, a_fn, wh)
     
     for i_fn, m_fn, in tqdm(zip(img_fns, masks_fns)):
         s = sampler.GridSampler(i_fn, m_fn, wh)
@@ -53,7 +54,7 @@ def cut_glomi(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
-            if idx > 100: return
+            if idx > 10: break
 
 def cut_grid(imgs_path, masks_path, dst_path):
     filt = partial(utils.filter_ban_str_in_name, bans=['-', '_ell'])
@@ -98,7 +99,7 @@ def cut_grid(imgs_path, masks_path, dst_path):
             cv2.imwrite(str(img_name), i)
             cv2.imwrite(str(mask_name), m)
 
-            if idx > 100: return
+            if idx > 10: break
 
 if __name__  == "__main__":
     src = 'input/'
@@ -107,14 +108,22 @@ if __name__  == "__main__":
     assert hub_src.exists()
 
     masks_path = src / 'bigmasks' # will be created
-    masks_path.mkdir(exist_ok=True)
-    create_masks(str(hub_src), str(masks_path))
+    try:
+        masks_path.mkdir(exist_ok=False)
+        create_masks(str(hub_src), str(masks_path))
+    except FileExistsError:
+        print('\n\nMASKS ALREADY CREATED? SKIPING BIG TIFF MASK CREATION')
 
     imgs_path = hub_src / 'train'
     grid_path = src / 'CUTS/grid_x33_1024/'
     glomi_path = src / 'CUTS/glomi_x33_1024/'
 
-    cut_glomi(imgs_path, masks_path, glomi_path)
-    cut_grid(imgs_path, masks_path, grid_path)
+    # this cuts big tiffs on tile based grid
+    if not grid_path.exists(): cut_grid(imgs_path, masks_path, grid_path)
+    # this cuts big tiffs based on annotation json, each object get its own cut
+    if not glomi_path.exists(): cut_glomi(imgs_path, masks_path, glomi_path)
 
+    # This breaks cutted tiff's into train and val splits based in tiff ids
+    do_split(grid_path, src / 'SPLITS/grid_split' )
+    do_split(glomi_path, src / 'SPLITS/glomi_split' )
 

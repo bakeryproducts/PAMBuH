@@ -92,7 +92,7 @@ if __name__ == '__main__':
     test_folder = Path(args.test_folder)
     gpu_list = [0]#[0,1,2,3]
     thresholds = [.5]
-    use_tta = True
+    use_tta = False
     save_predicts = True
     to_rle = True
     do_inf = True
@@ -111,4 +111,4 @@ if __name__ == '__main__':
     else:
         results = read_results(model_folder, img_names, thresholds)
 
-    if to_rle: dump_to_csv(results, model_folder, thresholds[0])
+    if to_rle: dump_to_csv(results, model_folder, test_folder, thresholds[0])

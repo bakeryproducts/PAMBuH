@@ -91,8 +91,8 @@ def image_q_reader(q, img_name, cds, pad):
 def mp_func_wrapper(func, args): return func(*args)
 def chunkify(l, n): return [l[i:i + n] for i in range(0, len(l), n)]
 
-def dump_to_csv(results, dst_path, threshold):
-    df = pd.read_csv('input/hm/sample_submission.csv', index_col='id')
+def dump_to_csv(results, dst_path, test_folder, threshold):
+    df = pd.read_csv(str(test_folder / 'sample_submission.csv'), index_col='id')
     for k, v in results.items():
         df.loc[k.stem] = v
     df.to_csv(str(dst_path / f'submission__{round(threshold, 3)}.csv'))

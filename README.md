@@ -93,6 +93,11 @@ Data structure:
 
 # Usage
 
+All scripts should run from root directory:
+```
+python3 src/data_gen.py
+```
+
 ### Install Requirements
 One specific requirement is shallow library, src/shallow
 ```
@@ -165,11 +170,11 @@ TRAIN:
 
 Inference working like this:
 ```
-python3 src/run_inference.py TIMESTAMPED_FOLDER_WITH_RESULTS_FROM_TRAINING FOLDER_WITH_TEST_DATA
+python3 src/run_inference.py --model_folder TIMESTAMPED_FOLDER_WITH_RESULTS_FROM_TRAINING --test_folder FOLDER_WITH_TEST_DATA
 ```
 i.e.
 ```
-python3 src/run_inference.py  2021_feb_07_12_13_55  input/HUBMAP/test
+python3 src/run_inference.py  --model_folder output/2021_feb_07_12_13_55  --test_folder input/HUBMAP/test
 ```
 
 Script will select best model from checkpoints based on val score, and run inference on .tiff images in specified folder

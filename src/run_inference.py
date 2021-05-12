@@ -92,7 +92,7 @@ if __name__ == '__main__':
     test_folder = Path(args.test_folder)
     gpu_list = [0]#[0,1,2,3]
     thresholds = [.5]
-    use_tta = False
+    use_tta = True
     save_predicts = True
     to_rle = True
     do_inf = True

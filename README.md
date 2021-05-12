@@ -6,10 +6,10 @@ kindney challenge
 
 Our rig was single node machine:
 
--16CPU
--4GPU V100 32gb
--256gb RAM
--a lot of memory, one folded model produce ~50gb of date at the end of inference phase
+- 16CPU
+- 4GPU V100 32gb
+- 256gb RAM
+- a lot of memory, one folded model produce ~50gb of date at the end of inference phase
 
 
 ### Result of LB .925 / PB .949 can be achieved without ensembling with single 4fold model Unet-timm-regnety16 under 2hrs of training, default config
@@ -164,10 +164,10 @@ python3 src/run_inference.py  2021_feb_07_12_13_55  input/HUBMAP/test
 Script will select best model from checkpoints based on val score, and run inference on .tiff images in specified folder
 There are switchable options in script, such as:
 
--save RLE
--do TTA
--save Masks
--multiprocessing with one image per GPU
+- save RLE
+- do TTA
+- save Masks
+- multiprocessing with one image per GPU
 
 
 This script is quite different from kaggle inference notebook, since we own and can use more resources locally
